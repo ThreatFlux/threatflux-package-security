@@ -1,14 +1,14 @@
 # 🔄 CI/CD Workflows
 
-This directory contains the complete CI/CD pipeline for the ThreatFlux File Scanner project.
+This directory contains the complete CI/CD pipeline for the ThreatFlux Package Security Library.
 
 ## 📋 Workflow Overview
 
 | Workflow | Trigger | Purpose | Duration |
 |----------|---------|---------|----------|
-| [`ci.yml`](ci.yml) | Push/PR | Main testing pipeline | ~8-12 min |
-| [`release.yml`](release.yml) | Tag push | Release automation | ~15-20 min |
-| [`docs.yml`](docs.yml) | Push to main | Documentation building | ~5-8 min |
+| [`ci.yml`](ci.yml) | Push/PR | Library testing pipeline | ~6-10 min |
+| [`release.yml`](release.yml) | Tag push | Library release automation | ~8-12 min |
+| [`docs.yml`](docs.yml) | Push to main | API documentation building | ~4-6 min |
 | [`security.yml`](security.yml) | Push/PR/Schedule | Security scanning | ~10-15 min |
 | [`dependency-update.yml`](dependency-update.yml) | Schedule/Manual | Dependency updates | ~5-10 min |
 
@@ -19,35 +19,35 @@ This directory contains the complete CI/CD pipeline for the ThreatFlux File Scan
 - ✅ Linting (`cargo clippy`)
 - ✅ Documentation generation
 
-### Comprehensive Testing (< 10 min)
+### Comprehensive Testing (< 8 min)
 - 🔧 **Multi-platform**: Ubuntu, Windows, macOS
 - 🦀 **Multi-Rust**: stable, beta, MSRV (1.75.0), nightly
-- 📦 **Workspace-aware**: All libraries tested individually
-- 🧪 **Integration tests**: CLI functionality and MCP server
+- 📦 **Feature Testing**: Library features tested individually
+- 🧪 **Integration tests**: Library integration and comprehensive tests
 - 📊 **Performance**: Benchmarking on PRs
 
-### Library Testing
-Each library is tested independently with different feature combinations:
-- Default features
-- No features (`--no-default-features`)
-- All features (`--all-features`)
+### Feature Testing
+The library is tested with different feature combinations:
+- `default` (includes concurrent)
+- `concurrent` (concurrent analysis capabilities)
+- `offline` (disable online vulnerability database updates)
+- Combined features (`concurrent,offline`)
 
-### Build Artifacts
-Cross-platform binaries built for:
+### Cross-Platform Verification
+Library compatibility verified on:
 - `x86_64-unknown-linux-gnu`
 - `x86_64-pc-windows-msvc`
 - `x86_64-apple-darwin`
-- `aarch64-apple-darwin`
 
 ## 🎯 Release Pipeline (`release.yml`)
 
 ### Automated Release Process
 1. **Validation**: Version format and pre-release checks
 2. **Testing**: Full CI pipeline execution
-3. **Building**: Multi-platform release artifacts
+3. **Packaging**: Library crate packaging and source archives
 4. **Changelog**: Automatic generation from commits and PRs
-5. **GitHub Release**: Automated creation with assets
-6. **Versioning**: Workspace version coordination
+5. **GitHub Release**: Automated creation with library packages
+6. **Versioning**: Library version updates
 7. **Registry**: Optional crates.io publishing
 
 ### Release Types
@@ -60,16 +60,16 @@ Cross-platform binaries built for:
 
 ### Documentation Generation
 - 🦀 **Rust Docs**: Complete API documentation with `rustdoc`
-- 📖 **Additional Docs**: CLI help, OpenAPI specs, guides
+- 📖 **Library Examples**: Usage examples and code patterns
 - 🔍 **Quality Checks**: Missing documentation detection
 - 🌐 **Deployment**: GitHub Pages integration
 
 ### Documentation Coverage
-- All workspace libraries
+- Library API documentation
 - Private items documentation
 - Code examples and doctests
-- CLI help text
-- MCP server OpenAPI specification
+- Usage patterns and examples
+- Module-level documentation
 
 ## 🔒 Security Pipeline (`security.yml`)
 
