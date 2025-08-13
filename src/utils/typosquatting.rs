@@ -86,9 +86,8 @@ impl TyposquattingDetector {
         ];
 
         for suffix in SUSPICIOUS_SUFFIXES {
-            if name.ends_with(suffix) {
+            if let Some(base) = name.strip_suffix(suffix) {
                 // Check if removing suffix matches a popular package
-                let base = &name[..name.len() - suffix.len()];
                 if self.popular_packages.contains(base) {
                     return true;
                 }
@@ -104,8 +103,7 @@ impl TyposquattingDetector {
             &["fake-", "test-", "my-", "new-", "real-", "official-"];
 
         for prefix in SUSPICIOUS_PREFIXES {
-            if name.starts_with(prefix) {
-                let base = &name[prefix.len()..];
+            if let Some(base) = name.strip_prefix(prefix) {
                 if self.popular_packages.contains(base) {
                     return true;
                 }

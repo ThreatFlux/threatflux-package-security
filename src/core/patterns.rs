@@ -60,7 +60,7 @@ impl PatternMatcher {
         let patterns = Self::default_patterns();
         let compiled = patterns
             .into_iter()
-            .map(|p| Self::compile_pattern(p))
+            .map(Self::compile_pattern)
             .collect::<Result<Vec<_>>>()?;
 
         Ok(Self { patterns: compiled })
@@ -70,7 +70,7 @@ impl PatternMatcher {
     pub fn with_patterns(patterns: Vec<MaliciousPattern>) -> Result<Self> {
         let compiled = patterns
             .into_iter()
-            .map(|p| Self::compile_pattern(p))
+            .map(Self::compile_pattern)
             .collect::<Result<Vec<_>>>()?;
 
         Ok(Self { patterns: compiled })

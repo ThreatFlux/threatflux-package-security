@@ -416,7 +416,7 @@ impl PackageAnalyzer for NpmAnalyzer {
             summary: format!(
                 "NPM package '{}' has {} risk with {} vulnerabilities and {} malicious patterns",
                 package.metadata.name,
-                risk_score.risk_level.to_string(),
+                risk_score.risk_level,
                 vulnerabilities.len(),
                 malicious_patterns.len()
             ),

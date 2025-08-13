@@ -1,6 +1,6 @@
 //! Java package analyzer
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -8,9 +8,8 @@ use std::path::Path;
 use zip::ZipArchive;
 
 use crate::core::{
-    AnalysisResult, Dependency, DependencyAnalysis, DependencyType, MaliciousPattern,
-    PackageAnalyzer, PackageInfo, PackageMetadata, PatternMatcher, RiskAssessment, RiskCalculator,
-    Vulnerability,
+    AnalysisResult, DependencyAnalysis, MaliciousPattern, PackageAnalyzer, PackageInfo,
+    PackageMetadata, PatternMatcher, RiskAssessment, RiskCalculator, Vulnerability,
 };
 use crate::utils::typosquatting::TyposquattingDetector;
 use crate::vulnerability_db::VulnerabilityDatabase;
@@ -164,7 +163,7 @@ impl JavaAnalyzer {
         let mut manifest_attributes = HashMap::new();
         let mut main_class = None;
         let mut is_signed = false;
-        let mut android_info = None;
+        let android_info = None;
 
         // Read manifest
         if let Ok(mut manifest_file) = archive.by_name("META-INF/MANIFEST.MF") {
@@ -320,8 +319,7 @@ impl PackageAnalyzer for JavaAnalyzer {
             risk_score: risk_score.clone(),
             summary: format!(
                 "Java archive '{}' has {} risk",
-                package.metadata.name,
-                risk_score.risk_level.to_string()
+                package.metadata.name, risk_score.risk_level
             ),
             detailed_findings: vec![],
             recommendations: vec![],

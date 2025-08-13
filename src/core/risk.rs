@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 
-use super::{MaliciousPattern, Vulnerability, VulnerabilitySeverity};
+use super::{MaliciousPattern, Vulnerability};
 
 /// Risk level categories
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]

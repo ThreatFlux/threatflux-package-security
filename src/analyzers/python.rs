@@ -1,6 +1,6 @@
 //! Python package analyzer
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -506,7 +506,7 @@ impl PackageAnalyzer for PythonAnalyzer {
             summary: format!(
                 "Python package '{}' has {} risk with {} vulnerabilities",
                 package.metadata.name,
-                risk_score.risk_level.to_string(),
+                risk_score.risk_level,
                 vulnerabilities.len()
             ),
             detailed_findings: vec![],
