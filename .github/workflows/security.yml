@@ -1,0 +1,549 @@
+name: Security
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security scans daily at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  # Rust security audit
+  cargo-audit:
+    name: Cargo Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: cargo-audit
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --features=fix
+
+      - name: Update advisory database
+        run: cargo audit --update
+
+      - name: Run security audit
+        run: |
+          cargo audit --json > audit-results.json || true
+          cargo audit || AUDIT_FAILED=true
+          
+          # Generate human-readable report
+          echo "# Security Audit Report" > audit-report.md
+          echo "" >> audit-report.md
+          echo "Generated on: $(date)" >> audit-report.md
+          echo "" >> audit-report.md
+          
+          if [[ "$AUDIT_FAILED" == "true" ]]; then
+            echo "⚠️ **Security vulnerabilities found!**" >> audit-report.md
+            echo "" >> audit-report.md
+            echo "## Vulnerabilities" >> audit-report.md
+            echo '```' >> audit-report.md
+            cargo audit 2>&1 >> audit-report.md || true
+            echo '```' >> audit-report.md
+          else
+            echo "✅ **No known security vulnerabilities found**" >> audit-report.md
+          fi
+
+      - name: Upload audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-audit-results
+          path: |
+            audit-results.json
+            audit-report.md
+          retention-days: 30
+
+      - name: Comment on PR (if vulnerabilities found)
+        if: github.event_name == 'pull_request' && failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('audit-report.md')) {
+              const report = fs.readFileSync('audit-report.md', 'utf8');
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 🔒 Security Audit Results\n\n${report}`
+              });
+            }
+
+  # Dependency scanning with cargo-deny
+  cargo-deny:
+    name: Cargo Deny Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: cargo-deny
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny
+
+      - name: Create deny.toml configuration
+        run: |
+          cat > deny.toml << 'EOF'
+          [graph]
+          targets = [
+              { triple = "x86_64-unknown-linux-gnu" },
+              { triple = "x86_64-pc-windows-msvc" },
+              { triple = "x86_64-apple-darwin" },
+          ]
+          
+          [advisories]
+          db-path = "~/.cargo/advisory-db"
+          db-urls = ["https://github.com/rustsec/advisory-db"]
+          vulnerability = "deny"
+          unmaintained = "warn"
+          yanked = "deny"
+          notice = "warn"
+          ignore = []
+          
+          [licenses]
+          unlicensed = "deny"
+          allow = [
+              "MIT",
+              "Apache-2.0",
+              "Apache-2.0 WITH LLVM-exception",
+              "BSD-2-Clause",
+              "BSD-3-Clause",
+              "ISC",
+              "Unicode-DFS-2016",
+              "CC0-1.0",
+          ]
+          deny = [
+              "GPL-2.0",
+              "GPL-3.0",
+              "AGPL-1.0",
+              "AGPL-3.0",
+              "LGPL-2.0",
+              "LGPL-2.1",
+              "LGPL-3.0",
+          ]
+          copyleft = "deny"
+          allow-osi-fsf-free = "both"
+          default = "deny"
+          confidence-threshold = 0.8
+          
+          [bans]
+          multiple-versions = "warn"
+          wildcards = "allow"
+          highlight = "all"
+          deny = []
+          skip = []
+          skip-tree = []
+          
+          [sources]
+          unknown-registry = "warn"
+          unknown-git = "warn"
+          allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+          allow-git = []
+          EOF
+
+      - name: Run cargo-deny
+        run: |
+          cargo deny check --log-level error advisories
+          cargo deny check --log-level error licenses
+          cargo deny check --log-level error sources
+          cargo deny check --log-level warn bans
+
+      - name: Generate deny report
+        if: always()
+        run: |
+          echo "# Dependency Analysis Report" > deny-report.md
+          echo "" >> deny-report.md
+          echo "Generated on: $(date)" >> deny-report.md
+          echo "" >> deny-report.md
+          
+          echo "## License Check" >> deny-report.md
+          echo '```' >> deny-report.md
+          cargo deny check licenses 2>&1 >> deny-report.md || true
+          echo '```' >> deny-report.md
+          echo "" >> deny-report.md
+          
+          echo "## Advisory Check" >> deny-report.md
+          echo '```' >> deny-report.md
+          cargo deny check advisories 2>&1 >> deny-report.md || true
+          echo '```' >> deny-report.md
+
+      - name: Upload deny results
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-deny-results
+          path: deny-report.md
+          retention-days: 30
+
+  # CodeQL analysis
+  codeql-analysis:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'cpp' ] # Rust is analyzed as C++
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          config: |
+            name: "Security Analysis"
+            disable-default-queries: false
+            queries:
+              - security-and-quality
+              - security-extended
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: codeql
+
+      - name: Build for CodeQL
+        run: |
+          # Build the project for analysis
+          cargo build --workspace --all-features
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # Semgrep static analysis
+  semgrep-analysis:
+    name: Semgrep Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/rust
+            p/supply-chain
+          generateSarif: "1"
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+        if: always()
+
+  # Supply chain security
+  supply-chain-security:
+    name: Supply Chain Security
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: supply-chain
+
+      - name: Generate dependency tree
+        run: |
+          cargo tree --format "{p} {l}" > dependency-tree.txt
+          cargo tree --duplicates > duplicate-deps.txt || echo "No duplicate dependencies" > duplicate-deps.txt
+
+      - name: Check for known malicious packages
+        run: |
+          # Create a basic check for known problematic crates
+          echo "# Supply Chain Security Report" > supply-chain-report.md
+          echo "" >> supply-chain-report.md
+          echo "Generated on: $(date)" >> supply-chain-report.md
+          echo "" >> supply-chain-report.md
+          
+          # List of crates to watch for (example - expand as needed)
+          WATCH_CRATES=("event-stream" "ua-parser-js" "lodash" "minimist")
+          
+          echo "## Dependency Analysis" >> supply-chain-report.md
+          echo "" >> supply-chain-report.md
+          
+          for crate in "${WATCH_CRATES[@]}"; do
+            if grep -q "$crate" dependency-tree.txt; then
+              echo "⚠️ Found potentially risky dependency: $crate" >> supply-chain-report.md
+            fi
+          done
+          
+          # Check for excessive dependencies
+          DEP_COUNT=$(wc -l < dependency-tree.txt)
+          echo "- Total dependencies: $DEP_COUNT" >> supply-chain-report.md
+          
+          if [[ $DEP_COUNT -gt 200 ]]; then
+            echo "⚠️ High dependency count ($DEP_COUNT) - consider reducing" >> supply-chain-report.md
+          fi
+          
+          echo "" >> supply-chain-report.md
+          echo "## Duplicate Dependencies" >> supply-chain-report.md
+          echo '```' >> supply-chain-report.md
+          cat duplicate-deps.txt >> supply-chain-report.md
+          echo '```' >> supply-chain-report.md
+
+      - name: Upload supply chain report
+        uses: actions/upload-artifact@v4
+        with:
+          name: supply-chain-report
+          path: |
+            supply-chain-report.md
+            dependency-tree.txt
+            duplicate-deps.txt
+          retention-days: 30
+
+  # Secrets scanning
+  secrets-scan:
+    name: Secrets Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          wget -O gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_8.21.2_linux_x64.tar.gz
+          tar -xzf gitleaks.tar.gz
+          chmod +x gitleaks
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Create gitleaks config
+        run: |
+          cat > .gitleaks.toml << 'EOF'
+          [extend]
+          useDefault = true
+          
+          [[rules]]
+          id = "rust-api-key"
+          description = "Rust API key"
+          regex = '''(?i)(rust|cargo)[_-]?(api|token)[_-]?key[_-]?[:=]\s*['\"]?([a-zA-Z0-9_-]{20,})['\"]?'''
+          
+          [[rules]]
+          id = "generic-secret"
+          description = "Generic secret"
+          regex = '''(?i)(secret|password|token|key)[_-]?[:=]\s*['\"]?([a-zA-Z0-9_-]{16,})['\"]?'''
+          
+          [[rules]]
+          id = "private-key"
+          description = "Private key"
+          regex = '''-----BEGIN [A-Z]+ PRIVATE KEY-----'''
+          
+          [allowlist]
+          description = "Allowlisted files"
+          files = [
+              '''\.git/''',
+              '''test.*\.rs$''',
+              '''tests/.*\.rs$''',
+              '''examples/.*\.rs$''',
+          ]
+          
+          regexes = [
+              '''test[_-]?(secret|password|token|key)''',
+              '''example[_-]?(secret|password|token|key)''',
+              '''fake[_-]?(secret|password|token|key)''',
+              '''dummy[_-]?(secret|password|token|key)''',
+          ]
+          EOF
+
+      - name: Run gitleaks scan
+        run: |
+          gitleaks detect --source . --config .gitleaks.toml --report-format json --report-path gitleaks-report.json --verbose || SECRETS_FOUND=true
+          
+          # Generate human-readable report
+          echo "# Secrets Scanning Report" > secrets-report.md
+          echo "" >> secrets-report.md
+          echo "Generated on: $(date)" >> secrets-report.md
+          echo "" >> secrets-report.md
+          
+          if [[ "$SECRETS_FOUND" == "true" ]]; then
+            echo "⚠️ **Potential secrets found!**" >> secrets-report.md
+            echo "" >> secrets-report.md
+            echo "Please review the findings and ensure no real secrets are committed." >> secrets-report.md
+            echo "" >> secrets-report.md
+            echo "## Findings" >> secrets-report.md
+            echo '```json' >> secrets-report.md
+            cat gitleaks-report.json >> secrets-report.md 2>/dev/null || echo "Error reading report" >> secrets-report.md
+            echo '```' >> secrets-report.md
+          else
+            echo "✅ **No secrets detected**" >> secrets-report.md
+          fi
+
+      - name: Upload secrets scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: secrets-scan-results
+          path: |
+            gitleaks-report.json
+            secrets-report.md
+          retention-days: 30
+
+      - name: Fail if secrets found
+        run: |
+          if [[ -f "gitleaks-report.json" ]] && [[ -s "gitleaks-report.json" ]]; then
+            echo "❌ Secrets detected in repository!"
+            exit 1
+          fi
+
+  # Container security scanning (if Dockerfile exists)
+  container-security:
+    name: Container Security
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' # Skip on scheduled runs
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for Dockerfile
+        id: dockerfile-check
+        run: |
+          if [[ -f "Dockerfile" ]]; then
+            echo "dockerfile_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "dockerfile_exists=false" >> $GITHUB_OUTPUT
+            echo "No Dockerfile found, skipping container security scan"
+          fi
+
+      - name: Build Docker image
+        if: steps.dockerfile-check.outputs.dockerfile_exists == 'true'
+        run: |
+          docker build -t file-scanner:security-test .
+
+      - name: Run Trivy security scan
+        if: steps.dockerfile-check.outputs.dockerfile_exists == 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'file-scanner:security-test'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        if: steps.dockerfile-check.outputs.dockerfile_exists == 'true'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Security summary
+  security-summary:
+    name: Security Summary
+    needs: [cargo-audit, cargo-deny, codeql-analysis, semgrep-analysis, supply-chain-security, secrets-scan]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Download all security reports
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Generate security summary
+        run: |
+          echo "# 🔒 Security Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Analysis Date:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Results Overview" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Cargo Audit | ${{ needs.cargo-audit.result }} | Rust security advisories |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cargo Deny | ${{ needs.cargo-deny.result }} | License and dependency validation |" >> $GITHUB_STEP_SUMMARY
+          echo "| CodeQL | ${{ needs.codeql-analysis.result }} | Static code analysis |" >> $GITHUB_STEP_SUMMARY
+          echo "| Semgrep | ${{ needs.semgrep-analysis.result }} | Security pattern detection |" >> $GITHUB_STEP_SUMMARY
+          echo "| Supply Chain | ${{ needs.supply-chain-security.result }} | Dependency security |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secrets Scan | ${{ needs.secrets-scan.result }} | Secret detection |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Count failures
+          FAILED_CHECKS=0
+          [[ "${{ needs.cargo-audit.result }}" == "failure" ]] && ((FAILED_CHECKS++))
+          [[ "${{ needs.cargo-deny.result }}" == "failure" ]] && ((FAILED_CHECKS++))
+          [[ "${{ needs.codeql-analysis.result }}" == "failure" ]] && ((FAILED_CHECKS++))
+          [[ "${{ needs.semgrep-analysis.result }}" == "failure" ]] && ((FAILED_CHECKS++))
+          [[ "${{ needs.supply-chain-security.result }}" == "failure" ]] && ((FAILED_CHECKS++))
+          [[ "${{ needs.secrets-scan.result }}" == "failure" ]] && ((FAILED_CHECKS++))
+          
+          if [[ $FAILED_CHECKS -eq 0 ]]; then
+            echo "## ✅ Security Status: PASS" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All security checks passed successfully!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Security Status: ATTENTION REQUIRED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**$FAILED_CHECKS security check(s) require attention.**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the failed checks and address any security concerns." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📋 Available Reports" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Security reports are available as workflow artifacts:" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔍 Cargo Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "- 📋 Cargo Deny Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 Supply Chain Report" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔐 Secrets Scan Results" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create security badge
+        run: |
+          if [[ $FAILED_CHECKS -eq 0 ]]; then
+            echo "SECURITY_STATUS=passing" >> $GITHUB_ENV
+            echo "SECURITY_COLOR=brightgreen" >> $GITHUB_ENV
+          else
+            echo "SECURITY_STATUS=attention" >> $GITHUB_ENV
+            echo "SECURITY_COLOR=orange" >> $GITHUB_ENV
+          fi

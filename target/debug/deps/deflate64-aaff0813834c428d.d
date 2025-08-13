@@ -1,0 +1,10 @@
+/Users/vtriple/file-scanner/threatflux-package-security/target/debug/deps/libdeflate64-aaff0813834c428d.rmeta: /Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/lib.rs /Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/huffman_tree.rs /Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/inflater_managed.rs /Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/input_buffer.rs /Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/output_window.rs /Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/stream.rs
+
+/Users/vtriple/file-scanner/threatflux-package-security/target/debug/deps/deflate64-aaff0813834c428d.d: /Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/lib.rs /Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/huffman_tree.rs /Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/inflater_managed.rs /Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/input_buffer.rs /Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/output_window.rs /Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/stream.rs
+
+/Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/lib.rs:
+/Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/huffman_tree.rs:
+/Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/inflater_managed.rs:
+/Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/input_buffer.rs:
+/Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/output_window.rs:
+/Users/vtriple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deflate64-0.1.9/src/stream.rs:

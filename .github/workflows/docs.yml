@@ -1,0 +1,445 @@
+name: Documentation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'file-scanner-*/**'
+      - 'Cargo.toml'
+      - 'README.md'
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'file-scanner-*/**'
+      - 'Cargo.toml'
+      - 'README.md'
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # Build Rust documentation
+  build-rust-docs:
+    name: Build Rust Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: docs
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Build documentation
+        run: |
+          cargo doc --workspace --all-features --no-deps --document-private-items
+        env:
+          RUSTDOCFLAGS: >
+            --cfg docsrs
+            --extern-html-root-url tokio=https://docs.rs/tokio/1/
+            --extern-html-root-url serde=https://docs.rs/serde/1/
+            --extern-html-root-url anyhow=https://docs.rs/anyhow/1/
+
+      - name: Add index page
+        run: |
+          cat > target/doc/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <meta charset="utf-8">
+              <title>ThreatFlux File Scanner Documentation</title>
+              <meta http-equiv="refresh" content="0; url=file_scanner/index.html">
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 40px; }
+                  .container { max-width: 800px; margin: 0 auto; }
+                  .library-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin: 20px 0; }
+                  .library-card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+                  .library-card h3 { margin-top: 0; color: #2d5aa0; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>ThreatFlux File Scanner Documentation</h1>
+                  <p>Comprehensive file analysis and security scanning toolkit written in Rust.</p>
+                  
+                  <h2>Main Documentation</h2>
+                  <p><a href="file_scanner/index.html">📖 Main Crate Documentation</a></p>
+                  
+                  <h2>Library Documentation</h2>
+                  <div class="library-grid">
+                      <div class="library-card">
+                          <h3><a href="file_scanner_core/index.html">file-scanner-core</a></h3>
+                          <p>Core data structures and shared functionality</p>
+                      </div>
+                      <div class="library-card">
+                          <h3><a href="file_scanner_metadata/index.html">file-scanner-metadata</a></h3>
+                          <p>File metadata extraction and analysis</p>
+                      </div>
+                      <div class="library-card">
+                          <h3><a href="file_scanner_hash/index.html">file-scanner-hash</a></h3>
+                          <p>Cryptographic hash calculations</p>
+                      </div>
+                      <div class="library-card">
+                          <h3><a href="file_scanner_strings/index.html">file-scanner-strings</a></h3>
+                          <p>String extraction and pattern matching</p>
+                      </div>
+                      <div class="library-card">
+                          <h3><a href="file_scanner_binary/index.html">file-scanner-binary</a></h3>
+                          <p>Binary format analysis (PE/ELF/Mach-O)</p>
+                      </div>
+                      <div class="library-card">
+                          <h3><a href="file_scanner_signature/index.html">file-scanner-signature</a></h3>
+                          <p>Digital signature verification</p>
+                      </div>
+                      <div class="library-card">
+                          <h3><a href="file_scanner_hexdump/index.html">file-scanner-hexdump</a></h3>
+                          <p>Hex dump generation and formatting</p>
+                      </div>
+                      <div class="library-card">
+                          <h3><a href="file_scanner_cache/index.html">file-scanner-cache</a></h3>
+                          <p>Analysis result caching system</p>
+                      </div>
+                      <div class="library-card">
+                          <h3><a href="file_scanner_npm/index.html">file-scanner-npm</a></h3>
+                          <p>NPM package security analysis</p>
+                      </div>
+                      <div class="library-card">
+                          <h3><a href="file_scanner_python/index.html">file-scanner-python</a></h3>
+                          <p>Python package security analysis</p>
+                      </div>
+                      <div class="library-card">
+                          <h3><a href="file_scanner_mcp/index.html">file-scanner-mcp</a></h3>
+                          <p>Model Context Protocol server implementation</p>
+                      </div>
+                  </div>
+                  
+                  <h2>Additional Resources</h2>
+                  <ul>
+                      <li><a href="https://github.com/ThreatFlux/threatflux-package-security">🔗 GitHub Repository</a></li>
+                      <li><a href="https://github.com/ThreatFlux/threatflux-package-security/releases">📦 Releases</a></li>
+                      <li><a href="https://github.com/ThreatFlux/threatflux-package-security/issues">🐛 Issues</a></li>
+                  </ul>
+              </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-docs
+          path: target/doc/
+          retention-days: 30
+
+  # Build additional documentation
+  build-additional-docs:
+    name: Build Additional Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Create docs directory
+        run: mkdir -p docs/generated
+
+      - name: Generate CLI documentation
+        run: |
+          # Install Rust to build the binary
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          source ~/.cargo/env
+          
+          # Build the scanner
+          cargo build --release
+          
+          # Generate help output
+          ./target/release/file-scanner --help > docs/generated/cli-help.txt
+          
+          # Generate MCP tools documentation
+          timeout 10s ./target/release/file-scanner mcp-stdio 2>/dev/null | head -100 > docs/generated/mcp-tools.json || true
+
+      - name: Generate OpenAPI documentation
+        run: |
+          # Create a simple script to extract OpenAPI from running server
+          cat > extract_openapi.sh << 'EOF'
+          #!/bin/bash
+          
+          # Start the HTTP server in background
+          ./target/release/file-scanner mcp-http --port 3001 &
+          SERVER_PID=$!
+          
+          # Wait for server to start
+          sleep 5
+          
+          # Fetch OpenAPI spec
+          curl -s http://localhost:3001/api-docs/openapi.json > docs/generated/openapi.json || echo "{}" > docs/generated/openapi.json
+          
+          # Clean up
+          kill $SERVER_PID 2>/dev/null || true
+          EOF
+          
+          chmod +x extract_openapi.sh
+          ./extract_openapi.sh
+
+      - name: Create documentation index
+        run: |
+          cat > docs/index.md << 'EOF'
+          # ThreatFlux File Scanner Documentation
+          
+          Welcome to the comprehensive documentation for the ThreatFlux File Scanner.
+          
+          ## Quick Start
+          
+          ```bash
+          # Install from release
+          curl -L -o file-scanner.tar.gz https://github.com/ThreatFlux/threatflux-package-security/releases/latest/download/file-scanner-v*-linux-x64.tar.gz
+          tar -xzf file-scanner.tar.gz
+          chmod +x file-scanner
+          
+          # Basic usage
+          ./file-scanner /path/to/file
+          
+          # Full analysis
+          ./file-scanner /path/to/file --all --format yaml
+          ```
+          
+          ## Documentation Sections
+          
+          - [🦀 Rust API Documentation](../rust-docs/index.html) - Complete API reference
+          - [💻 CLI Reference](cli-reference.html) - Command-line interface documentation
+          - [🔌 MCP Integration](mcp-integration.html) - Model Context Protocol server
+          - [📊 OpenAPI Specification](openapi.html) - HTTP API documentation
+          - [🏗️ Architecture](architecture.html) - System design and modular structure
+          - [🧪 Testing](testing.html) - Test coverage and validation
+          
+          ## Features
+          
+          - **File Metadata**: Complete filesystem metadata extraction
+          - **Cryptographic Hashing**: MD5, SHA256, SHA512, BLAKE3
+          - **String Analysis**: ASCII/Unicode extraction with pattern matching
+          - **Binary Analysis**: PE/ELF/Mach-O format parsing
+          - **Digital Signatures**: Authenticode, GPG, macOS code signing
+          - **Hex Dumps**: Flexible hex dump generation
+          - **Package Security**: NPM and Python package vulnerability analysis
+          - **MCP Server**: AI assistant integration via Model Context Protocol
+          - **Performance**: Async processing and intelligent caching
+          
+          ## Installation
+          
+          ### From Releases
+          
+          Download pre-built binaries from the [releases page](https://github.com/ThreatFlux/threatflux-package-security/releases).
+          
+          ### From Source
+          
+          ```bash
+          git clone https://github.com/ThreatFlux/threatflux-package-security.git
+          cd threatflux-package-security
+          cargo build --release
+          ```
+          
+          ## License
+          
+          This project is licensed under the MIT License.
+          EOF
+
+      - name: Upload additional docs
+        uses: actions/upload-artifact@v4
+        with:
+          name: additional-docs
+          path: docs/
+          retention-days: 30
+
+  # Check documentation quality
+  doc-quality-check:
+    name: Documentation Quality Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check for missing docs
+        run: |
+          cargo doc --workspace --all-features --document-private-items 2>&1 | tee doc_output.log
+          
+          # Check for warnings about missing documentation
+          if grep -q "warning: missing documentation" doc_output.log; then
+            echo "⚠️ Found missing documentation warnings:"
+            grep "warning: missing documentation" doc_output.log
+            echo ""
+            echo "Consider adding documentation to improve code quality."
+          else
+            echo "✅ No missing documentation warnings found"
+          fi
+
+      - name: Check documentation links
+        run: |
+          # Basic link checking for README and documentation files
+          find . -name "*.md" -exec echo "Checking {}" \; -exec grep -n "http" {} \; || true
+
+      - name: Generate documentation report
+        run: |
+          echo "# Documentation Quality Report" > doc_report.md
+          echo "" >> doc_report.md
+          echo "Generated on: $(date)" >> doc_report.md
+          echo "" >> doc_report.md
+          
+          # Count documented items
+          DOC_COUNT=$(cargo doc --workspace --all-features --document-private-items 2>&1 | grep -c "Documenting" || echo "0")
+          echo "- Documented crates: $DOC_COUNT" >> doc_report.md
+          
+          # Check for examples
+          EXAMPLE_COUNT=$(find . -name "*.rs" -exec grep -l "```" {} \; | wc -l)
+          echo "- Files with code examples: $EXAMPLE_COUNT" >> doc_report.md
+          
+          # Check README
+          if [[ -f "README.md" ]]; then
+            README_SIZE=$(wc -l < README.md)
+            echo "- README.md lines: $README_SIZE" >> doc_report.md
+          fi
+          
+          echo "" >> doc_report.md
+          echo "## Build Log" >> doc_report.md
+          echo '```' >> doc_report.md
+          cat doc_output.log >> doc_report.md
+          echo '```' >> doc_report.md
+
+      - name: Upload quality report
+        uses: actions/upload-artifact@v4
+        with:
+          name: doc-quality-report
+          path: doc_report.md
+          retention-days: 30
+
+  # Deploy to GitHub Pages (only on main branch push)
+  deploy-docs:
+    name: Deploy Documentation
+    needs: [build-rust-docs, build-additional-docs, doc-quality-check]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Download Rust docs
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-docs
+          path: docs-site/rust-docs/
+
+      - name: Download additional docs
+        uses: actions/download-artifact@v4
+        with:
+          name: additional-docs
+          path: docs-site/
+
+      - name: Create site structure
+        run: |
+          # Create main index file that redirects to docs
+          cat > docs-site/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <meta charset="utf-8">
+              <title>ThreatFlux File Scanner</title>
+              <meta http-equiv="refresh" content="0; url=rust-docs/index.html">
+              <style>
+                  body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
+                  .container { max-width: 600px; margin: 0 auto; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>ThreatFlux File Scanner</h1>
+                  <p>Redirecting to documentation...</p>
+                  <p><a href="rust-docs/index.html">📖 View Documentation</a></p>
+              </div>
+          </body>
+          </html>
+          EOF
+          
+          # Ensure all files are present
+          find docs-site -type f -name "*.html" | head -10
+
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-site/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # Summary job
+  docs-summary:
+    name: Documentation Summary
+    needs: [build-rust-docs, build-additional-docs, doc-quality-check, deploy-docs]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Documentation Summary
+        run: |
+          echo "# Documentation Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Rust Docs:** ${{ needs.build-rust-docs.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Additional Docs:** ${{ needs.build-additional-docs.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Quality Check:** ${{ needs.doc-quality-check.result }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.deploy-docs.result }}" != "skipped" ]]; then
+            echo "**Deployment:** ${{ needs.deploy-docs.result }}" >> $GITHUB_STEP_SUMMARY
+            if [[ "${{ needs.deploy-docs.result }}" == "success" ]]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "📚 **Documentation available at:** https://${{ github.repository_owner }}.github.io/$(echo '${{ github.repository }}' | cut -d'/' -f2)/" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "**Deployment:** Skipped (not main branch)" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "- 🦀 [Rust API Docs](https://${{ github.repository_owner }}.github.io/$(echo '${{ github.repository }}' | cut -d'/' -f2)/rust-docs/)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📖 [Main Documentation](https://${{ github.repository_owner }}.github.io/$(echo '${{ github.repository }}' | cut -d'/' -f2)/)" >> $GITHUB_STEP_SUMMARY

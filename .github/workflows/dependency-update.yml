@@ -1,0 +1,544 @@
+name: Dependency Updates
+
+on:
+  schedule:
+    # Run weekly on Mondays at 6 AM UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      update_type:
+        description: 'Type of update to perform'
+        required: true
+        type: choice
+        options:
+          - 'patch'
+          - 'minor'
+          - 'major'
+          - 'all'
+        default: 'patch'
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # Check for outdated dependencies
+  check-outdated:
+    name: Check Outdated Dependencies
+    runs-on: ubuntu-latest
+    outputs:
+      has_updates: ${{ steps.check.outputs.has_updates }}
+      update_summary: ${{ steps.check.outputs.update_summary }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: dependency-check
+
+      - name: Install cargo-outdated
+        run: cargo install cargo-outdated
+
+      - name: Check for outdated dependencies
+        id: check
+        run: |
+          # Check outdated dependencies
+          cargo outdated --format json > outdated.json || echo '[]' > outdated.json
+          cargo outdated > outdated.txt || echo "No outdated dependencies" > outdated.txt
+          
+          # Check if there are any updates
+          OUTDATED_COUNT=$(cat outdated.json | jq '. | length' 2>/dev/null || echo "0")
+          
+          if [[ "$OUTDATED_COUNT" -gt 0 ]]; then
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "Found $OUTDATED_COUNT outdated dependencies"
+          else
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+            echo "No outdated dependencies found"
+          fi
+          
+          # Create summary
+          SUMMARY="Found $OUTDATED_COUNT outdated dependencies"
+          echo "update_summary=$SUMMARY" >> $GITHUB_OUTPUT
+          
+          # Generate report
+          echo "# Dependency Update Report" > dependency-report.md
+          echo "" >> dependency-report.md
+          echo "Generated on: $(date)" >> dependency-report.md
+          echo "" >> dependency-report.md
+          echo "**Summary:** $SUMMARY" >> dependency-report.md
+          echo "" >> dependency-report.md
+          echo "## Outdated Dependencies" >> dependency-report.md
+          echo '```' >> dependency-report.md
+          cat outdated.txt >> dependency-report.md
+          echo '```' >> dependency-report.md
+
+      - name: Upload dependency report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-report
+          path: |
+            dependency-report.md
+            outdated.json
+            outdated.txt
+          retention-days: 30
+
+  # Update Cargo dependencies
+  update-cargo-deps:
+    name: Update Cargo Dependencies
+    needs: check-outdated
+    runs-on: ubuntu-latest
+    if: needs.check-outdated.outputs.has_updates == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: dependency-update
+
+      - name: Install cargo-edit and cargo-update
+        run: |
+          cargo install cargo-edit
+          cargo install cargo-update
+
+      - name: Determine update strategy
+        id: strategy
+        run: |
+          UPDATE_TYPE="${{ github.event.inputs.update_type }}"
+          if [[ -z "$UPDATE_TYPE" ]]; then
+            UPDATE_TYPE="patch"
+          fi
+          echo "update_type=$UPDATE_TYPE" >> $GITHUB_OUTPUT
+          echo "Using update strategy: $UPDATE_TYPE"
+
+      - name: Update dependencies (patch only)
+        if: steps.strategy.outputs.update_type == 'patch'
+        run: |
+          # Update only patch versions (safest)
+          cargo update
+
+      - name: Update dependencies (minor versions)
+        if: steps.strategy.outputs.update_type == 'minor'
+        run: |
+          # Update minor versions using cargo-edit
+          cargo upgrade --compatible
+
+      - name: Update dependencies (major versions)
+        if: steps.strategy.outputs.update_type == 'major'
+        run: |
+          # Update to latest versions (potentially breaking)
+          cargo upgrade
+
+      - name: Update dependencies (all)
+        if: steps.strategy.outputs.update_type == 'all'
+        run: |
+          # Update everything to latest
+          cargo upgrade --to-lockfile
+
+      - name: Check if changes were made
+        id: changes
+        run: |
+          if git diff --quiet Cargo.lock; then
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "No dependency changes made"
+          else
+            echo "changes=true" >> $GITHUB_OUTPUT
+            echo "Dependency changes detected"
+          fi
+
+      - name: Run tests after update
+        if: steps.changes.outputs.changes == 'true'
+        run: |
+          # Test that everything still works after updates
+          cargo check --workspace --all-features
+          cargo test --workspace --all-features --no-run  # Just build tests, don't run them all
+
+      - name: Generate update summary
+        if: steps.changes.outputs.changes == 'true'
+        run: |
+          echo "# Dependency Update Summary" > update-summary.md
+          echo "" >> update-summary.md
+          echo "**Update Type:** ${{ steps.strategy.outputs.update_type }}" >> update-summary.md
+          echo "**Date:** $(date)" >> update-summary.md
+          echo "" >> update-summary.md
+          
+          echo "## Changes Made" >> update-summary.md
+          echo '```diff' >> update-summary.md
+          git diff Cargo.lock >> update-summary.md
+          echo '```' >> update-summary.md
+          
+          echo "" >> update-summary.md
+          echo "## Verification" >> update-summary.md
+          echo "- ✅ Cargo check passed" >> update-summary.md
+          echo "- ✅ Test compilation passed" >> update-summary.md
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.changes == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: |
+            chore(deps): update dependencies (${{ steps.strategy.outputs.update_type }})
+            
+            Automated dependency update using ${{ steps.strategy.outputs.update_type }} strategy.
+            
+            - Update type: ${{ steps.strategy.outputs.update_type }}
+            - Generated by: dependency-update workflow
+            - Date: ${{ github.run_id }}
+          title: "chore(deps): Update dependencies (${{ steps.strategy.outputs.update_type }})"
+          body: |
+            ## 📦 Dependency Update
+            
+            This PR contains automated dependency updates using the **${{ steps.strategy.outputs.update_type }}** update strategy.
+            
+            ### Update Summary
+            
+            ${{ needs.check-outdated.outputs.update_summary }}
+            
+            ### Changes
+            
+            - **Update Type:** ${{ steps.strategy.outputs.update_type }}
+            - **Workflow Run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - **Triggered:** ${{ github.event_name }}
+            
+            ### Verification
+            
+            - ✅ `cargo check` passed
+            - ✅ Test compilation passed
+            - ⏳ Full CI will run on this PR
+            
+            ### Review Checklist
+            
+            - [ ] Review the dependency changes
+            - [ ] Ensure CI passes completely
+            - [ ] Check for any breaking changes in major updates
+            - [ ] Verify security audit still passes
+            
+            ---
+            
+            🤖 This PR was created automatically by the dependency update workflow.
+          branch: "chore/dependency-update-${{ steps.strategy.outputs.update_type }}-${{ github.run_number }}"
+          delete-branch: true
+          labels: |
+            dependencies
+            automated
+            ${{ steps.strategy.outputs.update_type }}-update
+
+  # Security update check
+  security-updates:
+    name: Security-focused Updates
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: security-updates
+
+      - name: Install security tools
+        run: |
+          cargo install cargo-audit
+          cargo install cargo-edit
+
+      - name: Update advisory database
+        run: cargo audit --update
+
+      - name: Check for security advisories
+        run: |
+          cargo audit --json > security-advisories.json || true
+          
+          # Check if there are any vulnerabilities
+          VULN_COUNT=$(cat security-advisories.json | jq '.vulnerabilities.found | length' 2>/dev/null || echo "0")
+          
+          echo "Found $VULN_COUNT security vulnerabilities"
+          
+          if [[ "$VULN_COUNT" -gt 0 ]]; then
+            echo "SECURITY_UPDATES_NEEDED=true" >> $GITHUB_ENV
+            
+            # Generate security update report
+            echo "# Security Update Report" > security-update-report.md
+            echo "" >> security-update-report.md
+            echo "**⚠️ $VULN_COUNT security vulnerabilities found!**" >> security-update-report.md
+            echo "" >> security-update-report.md
+            echo "## Vulnerabilities" >> security-update-report.md
+            echo '```' >> security-update-report.md
+            cargo audit >> security-update-report.md
+            echo '```' >> security-update-report.md
+          else
+            echo "SECURITY_UPDATES_NEEDED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Attempt automatic security fixes
+        if: env.SECURITY_UPDATES_NEEDED == 'true'
+        run: |
+          # Try to update dependencies to fix security issues
+          cargo update
+          
+          # Check if the updates fixed the issues
+          cargo audit --json > security-advisories-after.json || true
+          VULN_COUNT_AFTER=$(cat security-advisories-after.json | jq '.vulnerabilities.found | length' 2>/dev/null || echo "0")
+          
+          if [[ "$VULN_COUNT_AFTER" -lt "$VULN_COUNT" ]]; then
+            echo "SECURITY_FIXES_APPLIED=true" >> $GITHUB_ENV
+            echo "Successfully reduced vulnerabilities from $VULN_COUNT to $VULN_COUNT_AFTER"
+          else
+            echo "SECURITY_FIXES_APPLIED=false" >> $GITHUB_ENV
+            echo "Automatic fixes did not resolve all vulnerabilities"
+          fi
+
+      - name: Create security update PR
+        if: env.SECURITY_FIXES_APPLIED == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: |
+            security: update dependencies to fix vulnerabilities
+            
+            Automated security update to address known vulnerabilities.
+            
+            - Fixes security advisories
+            - Generated by: dependency-update workflow
+            - Priority: HIGH
+          title: "🔒 SECURITY: Update dependencies to fix vulnerabilities"
+          body: |
+            ## 🔒 Security Update
+            
+            This PR contains **high-priority security updates** to fix known vulnerabilities.
+            
+            ### Security Summary
+            
+            - **Original vulnerabilities:** ${{ env.VULN_COUNT }}
+            - **Remaining vulnerabilities:** ${{ env.VULN_COUNT_AFTER }}
+            - **Status:** ${{ env.VULN_COUNT_AFTER == '0' && '✅ All fixed' || '⚠️ Partially fixed' }}
+            
+            ### Details
+            
+            Security advisories were found in the dependency tree. This PR updates dependencies to their latest secure versions.
+            
+            **⚠️ This is a security-related update and should be reviewed and merged promptly.**
+            
+            ### Review Checklist
+            
+            - [ ] Verify CI passes
+            - [ ] Confirm security audit now passes
+            - [ ] Check for any breaking changes
+            - [ ] Deploy to production promptly after merge
+            
+            ---
+            
+            🔒 This is an automated security update. Please review and merge promptly.
+          branch: "security/dependency-update-${{ github.run_number }}"
+          delete-branch: true
+          labels: |
+            security
+            dependencies
+            high-priority
+            automated
+
+      - name: Create security issue if fixes incomplete
+        if: env.SECURITY_UPDATES_NEEDED == 'true' && env.SECURITY_FIXES_APPLIED == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🔒 SECURITY: Manual intervention required for vulnerability fixes',
+              body: `## 🔒 Security Alert
+              
+              Automatic dependency updates could not resolve all security vulnerabilities.
+              
+              **Manual intervention is required.**
+              
+              ### Vulnerabilities Found
+              
+              ${process.env.VULN_COUNT} security vulnerabilities were detected that require manual resolution.
+              
+              ### Next Steps
+              
+              1. Review the security advisory details
+              2. Manually update the affected dependencies
+              3. Test for breaking changes
+              4. Create a security update PR
+              
+              ### Resources
+              
+              - [Security Advisory Details](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+              - [Cargo Audit Documentation](https://docs.rs/cargo-audit/)
+              
+              ---
+              
+              ⚠️ This issue was created automatically by the dependency update workflow.`,
+              labels: ['security', 'high-priority', 'manual-intervention-required']
+            });
+
+      - name: Upload security reports
+        if: env.SECURITY_UPDATES_NEEDED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-update-reports
+          path: |
+            security-update-report.md
+            security-advisories.json
+            security-advisories-after.json
+          retention-days: 90
+
+  # Node.js dependencies (if package.json exists)
+  update-node-deps:
+    name: Update Node.js Dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for package.json
+        id: package-check
+        run: |
+          if [[ -f "package.json" ]]; then
+            echo "package_json_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "package_json_exists=false" >> $GITHUB_OUTPUT
+            echo "No package.json found, skipping Node.js dependency updates"
+          fi
+
+      - name: Setup Node.js
+        if: steps.package-check.outputs.package_json_exists == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install npm-check-updates
+        if: steps.package-check.outputs.package_json_exists == 'true'
+        run: npm install -g npm-check-updates
+
+      - name: Check for Node.js updates
+        if: steps.package-check.outputs.package_json_exists == 'true'
+        run: |
+          ncu --format group > node-updates.txt || echo "No Node.js updates available" > node-updates.txt
+          
+          if ncu --errorLevel 2; then
+            echo "NODE_UPDATES_AVAILABLE=false" >> $GITHUB_ENV
+          else
+            echo "NODE_UPDATES_AVAILABLE=true" >> $GITHUB_ENV
+          fi
+
+      - name: Apply Node.js updates
+        if: steps.package-check.outputs.package_json_exists == 'true' && env.NODE_UPDATES_AVAILABLE == 'true'
+        run: |
+          ncu -u
+          npm install
+
+      - name: Create Node.js update PR
+        if: steps.package-check.outputs.package_json_exists == 'true' && env.NODE_UPDATES_AVAILABLE == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(deps): update Node.js dependencies"
+          title: "chore(deps): Update Node.js dependencies"
+          body: |
+            ## 📦 Node.js Dependency Update
+            
+            This PR updates Node.js dependencies to their latest versions.
+            
+            ### Changes
+            
+            ```
+            $(cat node-updates.txt)
+            ```
+            
+            ---
+            
+            🤖 This PR was created automatically by the dependency update workflow.
+          branch: "chore/node-dependency-update-${{ github.run_number }}"
+          delete-branch: true
+          labels: |
+            dependencies
+            nodejs
+            automated
+
+  # Cleanup old dependency update branches
+  cleanup-branches:
+    name: Cleanup Old Update Branches
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup old dependency branches
+        run: |
+          # Find and delete old dependency update branches
+          git branch -r | grep "origin/chore/dependency-update" | grep -v "$(date +%Y-%m)" | while read branch; do
+            branch_name=$(echo "$branch" | sed 's/origin\///')
+            echo "Deleting old branch: $branch_name"
+            git push origin --delete "$branch_name" || echo "Failed to delete $branch_name"
+          done
+
+  # Summary
+  dependency-update-summary:
+    name: Dependency Update Summary
+    needs: [check-outdated, update-cargo-deps, security-updates, update-node-deps]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "# 📦 Dependency Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Run Date:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Task | Status | Notes |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Outdated Check | ${{ needs.check-outdated.result }} | ${{ needs.check-outdated.outputs.update_summary }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cargo Updates | ${{ needs.update-cargo-deps.result }} | Rust dependencies |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Updates | ${{ needs.security-updates.result }} | Security-focused updates |" >> $GITHUB_STEP_SUMMARY
+          echo "| Node.js Updates | ${{ needs.update-node-deps.result }} | Node.js dependencies |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Count successful updates
+          SUCCESS_COUNT=0
+          [[ "${{ needs.check-outdated.result }}" == "success" ]] && ((SUCCESS_COUNT++))
+          [[ "${{ needs.update-cargo-deps.result }}" == "success" ]] && ((SUCCESS_COUNT++))
+          [[ "${{ needs.security-updates.result }}" == "success" ]] && ((SUCCESS_COUNT++))
+          [[ "${{ needs.update-node-deps.result }}" == "success" ]] && ((SUCCESS_COUNT++))
+          
+          echo "## Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Successful tasks: $SUCCESS_COUNT/4" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔍 Dependencies checked: ${{ needs.check-outdated.outputs.has_updates == 'true' && 'Updates found' || 'Up to date' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Security status: ${{ env.SECURITY_UPDATES_NEEDED == 'true' && 'Action required' || 'Secure' }}" >> $GITHUB_STEP_SUMMARY
