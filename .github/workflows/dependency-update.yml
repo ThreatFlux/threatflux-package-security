@@ -167,8 +167,8 @@ jobs:
         if: steps.changes.outputs.changes == 'true'
         run: |
           # Test that everything still works after updates
-          cargo check --workspace --all-features
-          cargo test --workspace --all-features --no-run  # Just build tests, don't run them all
+          cargo check --all-features
+          cargo test --all-features --no-run  # Just build tests, don't run them all
 
       - name: Generate update summary
         if: steps.changes.outputs.changes == 'true'

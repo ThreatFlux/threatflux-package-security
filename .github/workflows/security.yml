@@ -109,9 +109,11 @@ jobs:
       - name: Install cargo-deny
         run: cargo install cargo-deny
 
-      - name: Create deny.toml configuration
+      - name: Create deny.toml configuration if not exists
         run: |
-          cat > deny.toml << 'EOF'
+          if [[ ! -f "deny.toml" ]]; then
+            echo "Creating deny.toml configuration..."
+            cat > deny.toml << 'EOF'
           [graph]
           targets = [
               { triple = "x86_64-unknown-linux-gnu" },
@@ -168,6 +170,9 @@ jobs:
           allow-registry = ["https://github.com/rust-lang/crates.io-index"]
           allow-git = []
           EOF
+          else
+            echo "Using existing deny.toml configuration"
+          fi
 
       - name: Run cargo-deny
         run: |
@@ -243,7 +248,7 @@ jobs:
       - name: Build for CodeQL
         run: |
           # Build the project for analysis
-          cargo build --workspace --all-features
+          cargo build --all-features
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
@@ -437,44 +442,6 @@ jobs:
             exit 1
           fi
 
-  # Container security scanning (if Dockerfile exists)
-  container-security:
-    name: Container Security
-    runs-on: ubuntu-latest
-    if: github.event_name != 'schedule' # Skip on scheduled runs
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Check for Dockerfile
-        id: dockerfile-check
-        run: |
-          if [[ -f "Dockerfile" ]]; then
-            echo "dockerfile_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "dockerfile_exists=false" >> $GITHUB_OUTPUT
-            echo "No Dockerfile found, skipping container security scan"
-          fi
-
-      - name: Build Docker image
-        if: steps.dockerfile-check.outputs.dockerfile_exists == 'true'
-        run: |
-          docker build -t file-scanner:security-test .
-
-      - name: Run Trivy security scan
-        if: steps.dockerfile-check.outputs.dockerfile_exists == 'true'
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'file-scanner:security-test'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-
-      - name: Upload Trivy scan results
-        if: steps.dockerfile-check.outputs.dockerfile_exists == 'true'
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: 'trivy-results.sarif'
 
   # Security summary
   security-summary:

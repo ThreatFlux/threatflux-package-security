@@ -59,7 +59,7 @@ jobs:
 
       - name: Build documentation
         run: |
-          cargo doc --workspace --all-features --no-deps --document-private-items
+          cargo doc --all-features --no-deps --document-private-items
         env:
           RUSTDOCFLAGS: >
             --cfg docsrs
@@ -74,77 +74,60 @@ jobs:
           <html>
           <head>
               <meta charset="utf-8">
-              <title>ThreatFlux File Scanner Documentation</title>
-              <meta http-equiv="refresh" content="0; url=file_scanner/index.html">
+              <title>ThreatFlux Package Security Library Documentation</title>
+              <meta http-equiv="refresh" content="0; url=threatflux_package_security/index.html">
               <style>
                   body { font-family: Arial, sans-serif; margin: 40px; }
                   .container { max-width: 800px; margin: 0 auto; }
-                  .library-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin: 20px 0; }
-                  .library-card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
-                  .library-card h3 { margin-top: 0; color: #2d5aa0; }
+                  .module-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin: 20px 0; }
+                  .module-card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+                  .module-card h3 { margin-top: 0; color: #2d5aa0; }
               </style>
           </head>
           <body>
               <div class="container">
-                  <h1>ThreatFlux File Scanner Documentation</h1>
-                  <p>Comprehensive file analysis and security scanning toolkit written in Rust.</p>
+                  <h1>ThreatFlux Package Security Library Documentation</h1>
+                  <p>Unified package security analysis framework for multiple package managers.</p>
                   
                   <h2>Main Documentation</h2>
-                  <p><a href="file_scanner/index.html">📖 Main Crate Documentation</a></p>
+                  <p><a href="threatflux_package_security/index.html">📖 Library Documentation</a></p>
                   
-                  <h2>Library Documentation</h2>
-                  <div class="library-grid">
-                      <div class="library-card">
-                          <h3><a href="file_scanner_core/index.html">file-scanner-core</a></h3>
-                          <p>Core data structures and shared functionality</p>
+                  <h2>Core Modules</h2>
+                  <div class="module-grid">
+                      <div class="module-card">
+                          <h3>🔍 Analyzers</h3>
+                          <p>Package-specific analysis engines for NPM, Python, and Java ecosystems</p>
                       </div>
-                      <div class="library-card">
-                          <h3><a href="file_scanner_metadata/index.html">file-scanner-metadata</a></h3>
-                          <p>File metadata extraction and analysis</p>
+                      <div class="module-card">
+                          <h3>🏗️ Core Types</h3>
+                          <p>Shared data structures and core functionality for package analysis</p>
                       </div>
-                      <div class="library-card">
-                          <h3><a href="file_scanner_hash/index.html">file-scanner-hash</a></h3>
-                          <p>Cryptographic hash calculations</p>
+                      <div class="module-card">
+                          <h3>🔧 Utilities</h3>
+                          <p>Common utilities for pattern matching, version parsing, and typosquatting detection</p>
                       </div>
-                      <div class="library-card">
-                          <h3><a href="file_scanner_strings/index.html">file-scanner-strings</a></h3>
-                          <p>String extraction and pattern matching</p>
-                      </div>
-                      <div class="library-card">
-                          <h3><a href="file_scanner_binary/index.html">file-scanner-binary</a></h3>
-                          <p>Binary format analysis (PE/ELF/Mach-O)</p>
-                      </div>
-                      <div class="library-card">
-                          <h3><a href="file_scanner_signature/index.html">file-scanner-signature</a></h3>
-                          <p>Digital signature verification</p>
-                      </div>
-                      <div class="library-card">
-                          <h3><a href="file_scanner_hexdump/index.html">file-scanner-hexdump</a></h3>
-                          <p>Hex dump generation and formatting</p>
-                      </div>
-                      <div class="library-card">
-                          <h3><a href="file_scanner_cache/index.html">file-scanner-cache</a></h3>
-                          <p>Analysis result caching system</p>
-                      </div>
-                      <div class="library-card">
-                          <h3><a href="file_scanner_npm/index.html">file-scanner-npm</a></h3>
-                          <p>NPM package security analysis</p>
-                      </div>
-                      <div class="library-card">
-                          <h3><a href="file_scanner_python/index.html">file-scanner-python</a></h3>
-                          <p>Python package security analysis</p>
-                      </div>
-                      <div class="library-card">
-                          <h3><a href="file_scanner_mcp/index.html">file-scanner-mcp</a></h3>
-                          <p>Model Context Protocol server implementation</p>
+                      <div class="module-card">
+                          <h3>🛡️ Vulnerability Database</h3>
+                          <p>Comprehensive vulnerability database with auto-update capabilities</p>
                       </div>
                   </div>
+                  
+                  <h2>Features</h2>
+                  <ul>
+                      <li>🔍 NPM package security analysis and vulnerability detection</li>
+                      <li>🐍 Python package security analysis with setup.py risk assessment</li>
+                      <li>☕ Java package analysis and vulnerability scanning</li>
+                      <li>🎭 Typosquatting detection across all package ecosystems</li>
+                      <li>🔗 Supply chain security assessment</li>
+                      <li>⚡ Async processing for high performance</li>
+                  </ul>
                   
                   <h2>Additional Resources</h2>
                   <ul>
                       <li><a href="https://github.com/ThreatFlux/threatflux-package-security">🔗 GitHub Repository</a></li>
                       <li><a href="https://github.com/ThreatFlux/threatflux-package-security/releases">📦 Releases</a></li>
                       <li><a href="https://github.com/ThreatFlux/threatflux-package-security/issues">🐛 Issues</a></li>
+                      <li><a href="https://crates.io/crates/threatflux-package-security">📦 Crates.io</a></li>
                   </ul>
               </div>
           </body>
@@ -175,92 +158,87 @@ jobs:
       - name: Create docs directory
         run: mkdir -p docs/generated
 
-      - name: Generate CLI documentation
+      - name: Generate library examples
         run: |
-          # Install Rust to build the binary
+          # Install Rust to build examples
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           source ~/.cargo/env
           
-          # Build the scanner
-          cargo build --release
+          # Generate library usage examples
+          echo "# Library Usage Examples" > docs/generated/examples.md
+          echo "" >> docs/generated/examples.md
           
-          # Generate help output
-          ./target/release/file-scanner --help > docs/generated/cli-help.txt
-          
-          # Generate MCP tools documentation
-          timeout 10s ./target/release/file-scanner mcp-stdio 2>/dev/null | head -100 > docs/generated/mcp-tools.json || true
-
-      - name: Generate OpenAPI documentation
-        run: |
-          # Create a simple script to extract OpenAPI from running server
-          cat > extract_openapi.sh << 'EOF'
-          #!/bin/bash
-          
-          # Start the HTTP server in background
-          ./target/release/file-scanner mcp-http --port 3001 &
-          SERVER_PID=$!
-          
-          # Wait for server to start
-          sleep 5
-          
-          # Fetch OpenAPI spec
-          curl -s http://localhost:3001/api-docs/openapi.json > docs/generated/openapi.json || echo "{}" > docs/generated/openapi.json
-          
-          # Clean up
-          kill $SERVER_PID 2>/dev/null || true
-          EOF
-          
-          chmod +x extract_openapi.sh
-          ./extract_openapi.sh
+          # Check if examples exist
+          if [[ -d "examples" ]]; then
+            for example in examples/*.rs; do
+              if [[ -f "$example" ]]; then
+                echo "## $(basename "$example" .rs)" >> docs/generated/examples.md
+                echo '```rust' >> docs/generated/examples.md
+                cat "$example" >> docs/generated/examples.md
+                echo '```' >> docs/generated/examples.md
+                echo "" >> docs/generated/examples.md
+              fi
+            done
+          else
+            echo "No examples directory found" >> docs/generated/examples.md
+          fi
 
       - name: Create documentation index
         run: |
           cat > docs/index.md << 'EOF'
-          # ThreatFlux File Scanner Documentation
+          # ThreatFlux Package Security Library Documentation
           
-          Welcome to the comprehensive documentation for the ThreatFlux File Scanner.
+          Welcome to the comprehensive documentation for the ThreatFlux Package Security Library.
           
           ## Quick Start
           
-          ```bash
-          # Install from release
-          curl -L -o file-scanner.tar.gz https://github.com/ThreatFlux/threatflux-package-security/releases/latest/download/file-scanner-v*-linux-x64.tar.gz
-          tar -xzf file-scanner.tar.gz
-          chmod +x file-scanner
+          Add the library to your `Cargo.toml`:
           
-          # Basic usage
-          ./file-scanner /path/to/file
+          ```toml
+          [dependencies]
+          threatflux-package-security = "0.1"
+          ```
           
-          # Full analysis
-          ./file-scanner /path/to/file --all --format yaml
+          Basic usage:
+          
+          ```rust
+          use threatflux_package_security::analyzers::npm::NpmAnalyzer;
+          use std::path::Path;
+          
+          #[tokio::main]
+          async fn main() -> anyhow::Result<()> {
+              let analyzer = NpmAnalyzer::new();
+              let result = analyzer.analyze_package(Path::new("./package.json")).await?;
+              println!("Analysis: {:#?}", result);
+              Ok(())
+          }
           ```
           
           ## Documentation Sections
           
           - [🦀 Rust API Documentation](../rust-docs/index.html) - Complete API reference
-          - [💻 CLI Reference](cli-reference.html) - Command-line interface documentation
-          - [🔌 MCP Integration](mcp-integration.html) - Model Context Protocol server
-          - [📊 OpenAPI Specification](openapi.html) - HTTP API documentation
-          - [🏗️ Architecture](architecture.html) - System design and modular structure
+          - [📚 Library Examples](examples.html) - Code examples and usage patterns
+          - [🏗️ Architecture](architecture.html) - Library design and module structure
           - [🧪 Testing](testing.html) - Test coverage and validation
           
           ## Features
           
-          - **File Metadata**: Complete filesystem metadata extraction
-          - **Cryptographic Hashing**: MD5, SHA256, SHA512, BLAKE3
-          - **String Analysis**: ASCII/Unicode extraction with pattern matching
-          - **Binary Analysis**: PE/ELF/Mach-O format parsing
-          - **Digital Signatures**: Authenticode, GPG, macOS code signing
-          - **Hex Dumps**: Flexible hex dump generation
-          - **Package Security**: NPM and Python package vulnerability analysis
-          - **MCP Server**: AI assistant integration via Model Context Protocol
-          - **Performance**: Async processing and intelligent caching
+          - **NPM Security**: Comprehensive NPM package vulnerability detection
+          - **Python Security**: Python package analysis with setup.py risk assessment
+          - **Java Security**: Java package analysis and vulnerability scanning
+          - **Typosquatting Detection**: Advanced detection across all package ecosystems
+          - **Supply Chain Security**: Complete supply chain risk assessment
+          - **Vulnerability Database**: Auto-updating vulnerability database with CVE integration
+          - **Performance**: Async processing for high-performance analysis
+          - **Extensible**: Modular design for easy extension to new package managers
           
           ## Installation
           
-          ### From Releases
+          ### From Crates.io
           
-          Download pre-built binaries from the [releases page](https://github.com/ThreatFlux/threatflux-package-security/releases).
+          ```bash
+          cargo add threatflux-package-security
+          ```
           
           ### From Source
           
@@ -270,9 +248,19 @@ jobs:
           cargo build --release
           ```
           
+          ### Features
+          
+          - `concurrent` (default): Enable concurrent analysis capabilities
+          - `offline`: Disable online vulnerability database updates
+          
+          ```toml
+          [dependencies]
+          threatflux-package-security = { version = "0.1", features = ["concurrent", "offline"] }
+          ```
+          
           ## License
           
-          This project is licensed under the MIT License.
+          This project is dual-licensed under MIT OR Apache-2.0.
           EOF
 
       - name: Upload additional docs
@@ -299,7 +287,7 @@ jobs:
 
       - name: Check for missing docs
         run: |
-          cargo doc --workspace --all-features --document-private-items 2>&1 | tee doc_output.log
+          cargo doc --all-features --document-private-items 2>&1 | tee doc_output.log
           
           # Check for warnings about missing documentation
           if grep -q "warning: missing documentation" doc_output.log; then
@@ -324,8 +312,8 @@ jobs:
           echo "" >> doc_report.md
           
           # Count documented items
-          DOC_COUNT=$(cargo doc --workspace --all-features --document-private-items 2>&1 | grep -c "Documenting" || echo "0")
-          echo "- Documented crates: $DOC_COUNT" >> doc_report.md
+          DOC_COUNT=$(cargo doc --all-features --document-private-items 2>&1 | grep -c "Documenting" || echo "0")
+          echo "- Documented library: $DOC_COUNT" >> doc_report.md
           
           # Check for examples
           EXAMPLE_COUNT=$(find . -name "*.rs" -exec grep -l "```" {} \; | wc -l)

@@ -66,33 +66,11 @@ jobs:
     needs: validate-release
     uses: ./.github/workflows/ci.yml
 
-  # Build release artifacts for all platforms
-  build-release-artifacts:
-    name: Build Release Artifacts
+  # Generate library package
+  build-library-package:
+    name: Build Library Package
     needs: [validate-release, pre-release-tests]
-    strategy:
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            name: linux-x64
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-            name: linux-x64-musl
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-            name: linux-arm64
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            name: windows-x64
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            name: macos-x64
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            name: macos-arm64
-    
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
@@ -100,66 +78,44 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          key: release-${{ matrix.target }}
+          key: release-package
 
-      - name: Install cross (for cross-compilation)
-        if: matrix.os == 'ubuntu-latest' && matrix.target != 'x86_64-unknown-linux-gnu'
-        run: cargo install cross --git https://github.com/cross-rs/cross
+      - name: Build library
+        run: cargo build --all-features --release
 
-      - name: Build release binary (native)
-        if: matrix.os != 'ubuntu-latest' || matrix.target == 'x86_64-unknown-linux-gnu'
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Package library crate
+        run: cargo package --allow-dirty
 
-      - name: Build release binary (cross-compile)
-        if: matrix.os == 'ubuntu-latest' && matrix.target != 'x86_64-unknown-linux-gnu'
-        run: cross build --release --target ${{ matrix.target }}
-
-      - name: Create release archive (Unix)
-        if: matrix.os != 'windows-latest'
+      - name: Create source archive
         run: |
-          mkdir -p release
-          cp target/${{ matrix.target }}/release/file-scanner release/
-          cp README.md LICENSE release/ 2>/dev/null || true
+          mkdir -p release-package
+          cp target/package/threatflux-package-security-*.crate release-package/
+          cp README.md CHANGELOG.md LICENSE* release-package/ 2>/dev/null || true
           
-          cd release
-          tar -czf file-scanner-${{ needs.validate-release.outputs.version }}-${{ matrix.name }}.tar.gz *
-          cd ..
-          mv release/file-scanner-${{ needs.validate-release.outputs.version }}-${{ matrix.name }}.tar.gz .
-
-      - name: Create release archive (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          mkdir release
-          copy target\${{ matrix.target }}\release\file-scanner.exe release\
-          copy README.md release\ 2>nul || echo "README.md not found"
-          copy LICENSE release\ 2>nul || echo "LICENSE not found"
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          CARGO_VERSION="${VERSION#v}"
           
-          cd release
-          tar -czf file-scanner-${{ needs.validate-release.outputs.version }}-${{ matrix.name }}.tar.gz *
+          cd release-package
+          tar -czf threatflux-package-security-${{ needs.validate-release.outputs.version }}-src.tar.gz *
           cd ..
-          move release\file-scanner-${{ needs.validate-release.outputs.version }}-${{ matrix.name }}.tar.gz .
+          mv release-package/threatflux-package-security-${{ needs.validate-release.outputs.version }}-src.tar.gz .
 
       - name: Generate checksums
         run: |
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            certutil -hashfile file-scanner-${{ needs.validate-release.outputs.version }}-${{ matrix.name }}.tar.gz SHA256 > file-scanner-${{ needs.validate-release.outputs.version }}-${{ matrix.name }}.tar.gz.sha256
-          else
-            shasum -a 256 file-scanner-${{ needs.validate-release.outputs.version }}-${{ matrix.name }}.tar.gz > file-scanner-${{ needs.validate-release.outputs.version }}-${{ matrix.name }}.tar.gz.sha256
-          fi
+          shasum -a 256 threatflux-package-security-${{ needs.validate-release.outputs.version }}-src.tar.gz > threatflux-package-security-${{ needs.validate-release.outputs.version }}-src.tar.gz.sha256
 
-      - name: Upload release artifacts
+      - name: Upload release package
         uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.name }}
+          name: library-package
           path: |
-            file-scanner-${{ needs.validate-release.outputs.version }}-${{ matrix.name }}.tar.gz
-            file-scanner-${{ needs.validate-release.outputs.version }}-${{ matrix.name }}.tar.gz.sha256
+            threatflux-package-security-${{ needs.validate-release.outputs.version }}-src.tar.gz
+            threatflux-package-security-${{ needs.validate-release.outputs.version }}-src.tar.gz.sha256
+            target/package/threatflux-package-security-*.crate
           retention-days: 5
 
   # Generate changelog
@@ -204,17 +160,16 @@ jobs:
             # Full changeset link
             CHANGELOG+="**Full Changeset**: https://github.com/${{ github.repository }}/compare/$PREVIOUS_TAG...$CURRENT_TAG"
           else
-            CHANGELOG+="Initial release of ThreatFlux File Scanner\n\n"
+            CHANGELOG+="Initial release of ThreatFlux Package Security Library\n\n"
             CHANGELOG+="### Features\n"
-            CHANGELOG+="- Comprehensive file analysis with metadata extraction\n"
-            CHANGELOG+="- Multi-format hash calculation (MD5, SHA256, SHA512, BLAKE3)\n"
-            CHANGELOG+="- String extraction and pattern matching\n"
-            CHANGELOG+="- Binary format analysis (PE/ELF/Mach-O)\n"
-            CHANGELOG+="- Digital signature verification\n"
-            CHANGELOG+="- Hex dump capabilities\n"
-            CHANGELOG+="- MCP server integration\n"
-            CHANGELOG+="- NPM and Python package security analysis\n"
-            CHANGELOG+="- Performance optimized with async processing\n"
+            CHANGELOG+="- NPM package security analysis and vulnerability detection\n"
+            CHANGELOG+="- Python package security analysis with setup.py risk assessment\n"
+            CHANGELOG+="- Java package analysis and vulnerability scanning\n"
+            CHANGELOG+="- Typosquatting detection across all package ecosystems\n"
+            CHANGELOG+="- Supply chain security assessment\n"
+            CHANGELOG+="- Unified package security framework\n"
+            CHANGELOG+="- Async processing for high performance\n"
+            CHANGELOG+="- Comprehensive vulnerability database with auto-updates\n"
           fi
           
           # Save changelog to file and output
@@ -237,7 +192,7 @@ jobs:
   # Create GitHub release
   create-release:
     name: Create GitHub Release
-    needs: [validate-release, build-release-artifacts, generate-changelog]
+    needs: [validate-release, build-library-package, generate-changelog]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -259,16 +214,17 @@ jobs:
           body: ${{ needs.generate-changelog.outputs.changelog }}
           prerelease: ${{ needs.validate-release.outputs.is_prerelease == 'true' }}
           files: |
-            file-scanner-*.tar.gz
-            file-scanner-*.tar.gz.sha256
+            threatflux-package-security-*.tar.gz
+            threatflux-package-security-*.tar.gz.sha256
+            threatflux-package-security-*.crate
           generate_release_notes: true
           append_body: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Update library versions (for workspace coordination)
-  update-versions:
-    name: Update Library Versions
+  # Update library version
+  update-version:
+    name: Update Library Version
     needs: [validate-release, create-release]
     runs-on: ubuntu-latest
     if: needs.validate-release.outputs.is_prerelease == 'false'
@@ -285,29 +241,20 @@ jobs:
       - name: Install cargo-edit
         run: cargo install cargo-edit
 
-      - name: Update workspace versions
+      - name: Update library version
         run: |
           VERSION="${{ needs.validate-release.outputs.version }}"
           # Remove 'v' prefix for cargo
           CARGO_VERSION="${VERSION#v}"
           
-          # Update main package version
+          # Update package version
           cargo set-version "$CARGO_VERSION"
-          
-          # Update all workspace members to the same version
-          for manifest in file-scanner-*/Cargo.toml; do
-            if [[ -f "$manifest" ]]; then
-              cd "$(dirname "$manifest")"
-              cargo set-version "$CARGO_VERSION"
-              cd ..
-            fi
-          done
 
-      - name: Commit version updates
+      - name: Commit version update
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add -A
+          git add Cargo.toml
           git diff --staged --quiet || git commit -m "chore: bump version to ${{ needs.validate-release.outputs.version }}"
           git push
 
@@ -325,43 +272,17 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Publish libraries to crates.io
+      - name: Publish library to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
-          # Publish libraries in dependency order
-          LIBRARIES=(
-            "file-scanner-core"
-            "file-scanner-metadata"
-            "file-scanner-hash"
-            "file-scanner-strings"
-            "file-scanner-binary"
-            "file-scanner-signature"
-            "file-scanner-hexdump"
-            "file-scanner-cache"
-            "file-scanner-npm"
-            "file-scanner-python"
-            "file-scanner-mcp"
-          )
-          
-          for lib in "${LIBRARIES[@]}"; do
-            if [[ -d "$lib" ]]; then
-              echo "Publishing $lib..."
-              cd "$lib"
-              cargo publish --allow-dirty || echo "Failed to publish $lib (may already exist)"
-              cd ..
-              sleep 30  # Wait for crates.io to process
-            fi
-          done
-          
-          # Finally publish main binary crate
-          echo "Publishing main crate..."
-          cargo publish --allow-dirty || echo "Failed to publish main crate (may already exist)"
+          echo "Publishing threatflux-package-security crate..."
+          cargo publish --allow-dirty || echo "Failed to publish crate (may already exist)"
 
   # Notify on release completion
   notify-completion:
     name: Notify Release Completion
-    needs: [validate-release, create-release, update-versions]
+    needs: [validate-release, create-release, update-version]
     runs-on: ubuntu-latest
     if: always()
     
