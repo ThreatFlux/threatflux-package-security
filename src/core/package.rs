@@ -56,6 +56,24 @@ impl QualityMetrics {
     }
 }
 
+/// Typosquatting risk assessment
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TyposquattingRisk {
+    pub is_potential_typosquatting: bool,
+    pub similar_packages: Vec<String>,
+    pub confidence_score: f32,
+}
+
+impl TyposquattingRisk {
+    pub fn is_potential_typosquatting(&self) -> bool {
+        self.is_potential_typosquatting
+    }
+
+    pub fn similar_packages(&self) -> &[String] {
+        &self.similar_packages
+    }
+}
+
 /// Package-specific information trait
 pub trait PackageInfo: Send + Sync {
     /// Get basic metadata
@@ -116,6 +134,11 @@ pub trait AnalysisResult: Send + Sync {
     /// Get quality metrics (placeholder)
     fn quality_metrics(&self) -> super::QualityMetrics {
         super::QualityMetrics::default()
+    }
+
+    /// Get typosquatting risk (default implementation)
+    fn typosquatting_risk(&self) -> Option<TyposquattingRisk> {
+        None
     }
 }
 

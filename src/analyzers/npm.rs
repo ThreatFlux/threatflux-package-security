@@ -81,6 +81,16 @@ impl AnalysisResult for NpmAnalysisResult {
     fn to_json(&self) -> Result<serde_json::Value> {
         Ok(serde_json::to_value(self)?)
     }
+
+    fn typosquatting_risk(&self) -> Option<crate::core::TyposquattingRisk> {
+        self.typosquatting_risk
+            .as_ref()
+            .map(|risk| crate::core::TyposquattingRisk {
+                is_potential_typosquatting: risk.is_likely_typosquatting,
+                similar_packages: risk.similar_packages.clone(),
+                confidence_score: risk.confidence,
+            })
+    }
 }
 
 /// NPM-specific scripts analysis

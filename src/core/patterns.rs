@@ -228,6 +228,86 @@ impl PatternMatcher {
                 file_patterns: vec![],
                 evidence: vec![],
             },
+            // Persistence patterns
+            MaliciousPattern {
+                pattern_id: "PERS_001".to_string(),
+                pattern_name: "System persistence".to_string(),
+                description: "Detects attempts to establish system persistence".to_string(),
+                category: PatternCategory::Persistence,
+                severity: PatternSeverity::High,
+                indicators: vec![
+                    "startup".to_string(),
+                    "autorun".to_string(),
+                    "registry run".to_string(),
+                ],
+                regex_patterns: vec![
+                    r"(?i)(startup|autorun|registry.*run)".to_string(),
+                    r"\.bashrc|\.profile|\.zshrc".to_string(),
+                    r"crontab|systemd|systemctl".to_string(),
+                ],
+                file_patterns: vec![],
+                evidence: vec![],
+            },
+            // Anti-analysis patterns
+            MaliciousPattern {
+                pattern_id: "ANTI_001".to_string(),
+                pattern_name: "Anti-analysis".to_string(),
+                description: "Detects anti-analysis and evasion techniques".to_string(),
+                category: PatternCategory::AntiAnalysis,
+                severity: PatternSeverity::Medium,
+                indicators: vec![
+                    "debugger".to_string(),
+                    "ollydbg".to_string(),
+                    "ida".to_string(),
+                ],
+                regex_patterns: vec![
+                    r"(?i)(debugger|ollydbg|ida|ghidra)".to_string(),
+                    r"IsDebuggerPresent|CheckRemoteDebuggerPresent".to_string(),
+                    r"ptrace.*PTRACE_TRACEME".to_string(),
+                ],
+                file_patterns: vec![],
+                evidence: vec![],
+            },
+            // Network access patterns
+            MaliciousPattern {
+                pattern_id: "NET_001".to_string(),
+                pattern_name: "Network access".to_string(),
+                description: "Detects network access capabilities".to_string(),
+                category: PatternCategory::NetworkAccess,
+                severity: PatternSeverity::Low,
+                indicators: vec![
+                    "urllib".to_string(),
+                    "requests".to_string(),
+                    "http".to_string(),
+                ],
+                regex_patterns: vec![
+                    r"(?i)(urllib|requests|http|socket)".to_string(),
+                    r"XMLHttpRequest|fetch\(".to_string(),
+                    r"curl|wget".to_string(),
+                ],
+                file_patterns: vec![],
+                evidence: vec![],
+            },
+            // File system access patterns
+            MaliciousPattern {
+                pattern_id: "FILE_001".to_string(),
+                pattern_name: "File system manipulation".to_string(),
+                description: "Detects suspicious file system operations".to_string(),
+                category: PatternCategory::FileSystemAccess,
+                severity: PatternSeverity::Medium,
+                indicators: vec![
+                    "unlink".to_string(),
+                    "rmdir".to_string(),
+                    "chmod".to_string(),
+                ],
+                regex_patterns: vec![
+                    r"(?i)(unlink|rmdir|chmod|chown)".to_string(),
+                    r"fs\.unlink|fs\.rmdir".to_string(),
+                    r"rm\s+-rf|del\s+/[qsf]".to_string(),
+                ],
+                file_patterns: vec![],
+                evidence: vec![],
+            },
         ]
     }
 }

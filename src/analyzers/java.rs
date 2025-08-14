@@ -117,8 +117,10 @@ pub struct JavaSecurityAnalysis {
 
 /// Java package analyzer
 pub struct JavaAnalyzer {
+    #[allow(dead_code)]
     vuln_db: Box<dyn VulnerabilityDatabase>,
     pattern_matcher: PatternMatcher,
+    #[allow(dead_code)]
     typo_detector: TyposquattingDetector,
 }
 

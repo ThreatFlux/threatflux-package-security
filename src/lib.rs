@@ -10,7 +10,7 @@ pub mod vulnerability_db;
 
 pub use core::{
     AnalysisResult, MaliciousPattern, PackageAnalyzer, PackageInfo, RiskLevel, RiskScore,
-    Vulnerability, VulnerabilitySeverity,
+    TyposquattingRisk, Vulnerability, VulnerabilitySeverity,
 };
 
 pub use analyzers::{java::JavaAnalyzer, npm::NpmAnalyzer, python::PythonAnalyzer};
