@@ -122,4 +122,4 @@ Contributions are welcome! Please see CONTRIBUTING.md for guidelines.
 
 ## License
 
-This project is licensed under MIT OR Apache-2.0.
+This project is licensed under MIT.
