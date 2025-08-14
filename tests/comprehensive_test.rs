@@ -503,38 +503,43 @@ async fn test_vulnerability_severity_classification() {
 
 // Additional security tests
 #[tokio::test]
+#[ignore = "requires zip bomb test data"]
 async fn test_zip_bomb_protection() {
     // Test that zip bombs are detected and handled safely
-    // This is a placeholder - would need actual zip bomb test data
-    assert!(true, "Zip bomb protection test placeholder");
+    // This would need actual zip bomb test data
+    todo!("Implement zip bomb protection test with actual test data");
 }
 
 #[tokio::test]
+#[ignore = "requires path traversal test data"]
 async fn test_path_traversal_protection() {
     // Test that package paths like ../../../etc/passwd are handled safely
-    // This is a placeholder - would need actual path traversal test data
-    assert!(true, "Path traversal protection test placeholder");
+    // This would need actual path traversal test data
+    todo!("Implement path traversal protection test with actual test data");
 }
 
 #[tokio::test]
+#[ignore = "requires large file test data"]
 async fn test_large_file_handling() {
     // Test memory usage with large package files
-    // This is a placeholder - would need actual large file test data
-    assert!(true, "Large file handling test placeholder");
+    // This would need actual large file test data
+    todo!("Implement large file handling test with actual test data");
 }
 
 #[tokio::test]
+#[ignore = "requires vulnerable package test data"]
 async fn test_vulnerability_detection_accuracy() {
     // Test against known vulnerable packages
     // Measure false positive/negative rates
-    // This is a placeholder - would need vulnerable package test data
-    assert!(true, "Vulnerability detection accuracy test placeholder");
+    // This would need vulnerable package test data
+    todo!("Implement vulnerability detection accuracy test with actual test data");
 }
 
 #[tokio::test]
+#[ignore = "requires typosquatting test data"]
 async fn test_typosquatting_detection_accuracy() {
     // Test against known typosquatting cases
     // Validate algorithm effectiveness
-    // This is a placeholder - would need typosquatting test data
-    assert!(true, "Typosquatting detection accuracy test placeholder");
+    // This would need typosquatting test data
+    todo!("Implement typosquatting detection accuracy test with actual test data");
 }
