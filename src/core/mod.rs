@@ -7,7 +7,7 @@ pub mod risk;
 pub mod vulnerability;
 
 pub use dependency::{Dependency, DependencyAnalysis, DependencyType};
-pub use package::{AnalysisResult, PackageAnalyzer, PackageInfo, PackageMetadata};
+pub use package::{AnalysisResult, PackageAnalyzer, PackageInfo, PackageMetadata, QualityMetrics};
 pub use patterns::{MaliciousPattern, PatternDatabase, PatternMatcher};
 pub use risk::{RiskAssessment, RiskCalculator, RiskLevel, RiskScore, SecurityPosture};
 pub use vulnerability::{

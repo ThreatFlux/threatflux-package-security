@@ -22,6 +22,40 @@ pub struct PackageMetadata {
     pub publish_date: Option<String>,
 }
 
+/// Package quality metrics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QualityMetrics {
+    pub documentation_score: f32,
+    pub has_tests: bool,
+    pub has_ci_cd: bool,
+    pub maintenance_score: f32,
+}
+
+impl Default for QualityMetrics {
+    fn default() -> Self {
+        Self {
+            documentation_score: 0.5,
+            has_tests: false,
+            has_ci_cd: false,
+            maintenance_score: 0.5,
+        }
+    }
+}
+
+impl QualityMetrics {
+    pub fn documentation_score(&self) -> f32 {
+        self.documentation_score
+    }
+
+    pub fn has_tests(&self) -> bool {
+        self.has_tests
+    }
+
+    pub fn has_ci_cd(&self) -> bool {
+        self.has_ci_cd
+    }
+}
+
 /// Package-specific information trait
 pub trait PackageInfo: Send + Sync {
     /// Get basic metadata
@@ -32,6 +66,11 @@ pub trait PackageInfo: Send + Sync {
 
     /// Get custom attributes specific to this package type
     fn custom_attributes(&self) -> HashMap<String, serde_json::Value>;
+
+    /// Get package name (convenience method)
+    fn name(&self) -> &str {
+        &self.metadata().name
+    }
 }
 
 /// Analysis result trait
@@ -53,6 +92,31 @@ pub trait AnalysisResult: Send + Sync {
 
     /// Convert to JSON representation
     fn to_json(&self) -> Result<serde_json::Value>;
+
+    /// Get overall risk level (convenience method)
+    fn overall_risk_level(&self) -> super::RiskLevel {
+        self.risk_assessment().risk_score.risk_level
+    }
+
+    /// Get malicious indicators (convenience method)
+    fn malicious_indicators(&self) -> &[super::MaliciousPattern] {
+        self.malicious_patterns()
+    }
+
+    /// Get supply chain risk score (convenience method)
+    fn supply_chain_risk_score(&self) -> f32 {
+        self.risk_assessment()
+            .risk_score
+            .components
+            .get("supply_chain")
+            .copied()
+            .unwrap_or(0.0)
+    }
+
+    /// Get quality metrics (placeholder)
+    fn quality_metrics(&self) -> super::QualityMetrics {
+        super::QualityMetrics::default()
+    }
 }
 
 /// Package analyzer trait
