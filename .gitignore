@@ -1,0 +1,81 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo.lock should be ignored for library crates
+Cargo.lock
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.#*
+\#*\#
+*.orig
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+.tmp/
+
+# Coverage reports
+tarpaulin-report.html
+coverage/
+lcov.info
+cobertura.xml
+
+# Benchmark results
+criterion/
+bench_results/
+flamegraph.svg
+perf.data*
+
+# Documentation build
+doc/
+docs/_build/
+
+# Environment files
+.env
+.env.local
+
+# Log files
+*.log
+logs/
+
+# Test artifacts
+test-results/
+test-output/
+
+# Profiling data
+*.profraw
+
+# Backup files
+*.bak
+*~
+
+# Release artifacts
+*.tar.gz
+*.zip
+*.deb
+*.rpm
+
+# Security scan results
+audit.json
+security-scan.json
+
+# Local development
+.cargo/config.toml.local
