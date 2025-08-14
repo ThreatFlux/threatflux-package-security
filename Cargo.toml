@@ -4,6 +4,7 @@
 name = "threatflux-package-security"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.75.0"
 authors = ["ThreatFlux"]
 description = "Unified package security analysis framework for multiple package managers"
 license = "MIT"
