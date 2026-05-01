@@ -39,6 +39,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -107,6 +109,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -254,6 +258,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
