@@ -65,9 +65,6 @@ jobs:
         env:
           RUSTDOCFLAGS: >
             --cfg docsrs
-            --extern-html-root-url tokio=https://docs.rs/tokio/1/
-            --extern-html-root-url serde=https://docs.rs/serde/1/
-            --extern-html-root-url anyhow=https://docs.rs/anyhow/1/
 
       - name: Add index page
         run: |
