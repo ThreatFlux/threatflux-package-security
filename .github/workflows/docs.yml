@@ -317,7 +317,7 @@ jobs:
           echo "- Documented library: $DOC_COUNT" >> doc_report.md
           
           # Check for examples
-          EXAMPLE_COUNT=$(find . -name "*.rs" -exec grep -l "```" {} \; | wc -l)
+          EXAMPLE_COUNT=$(find . -name "*.rs" -exec grep -l '```' {} \; | wc -l)
           echo "- Files with code examples: $EXAMPLE_COUNT" >> doc_report.md
           
           # Check README
