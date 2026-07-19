@@ -324,7 +324,7 @@ jobs:
           [[rules]]
           id = "generic-secret"
           description = "Generic secret"
-          regex = '''(?i)(secret|password|token|key)[_-]?[:=]\s*['\"]?([a-zA-Z0-9_-]{16,})['\"]?'''
+          regex = '''(?i)(secret|password|token|api[_-]?key|access[_-]?key|private[_-]?key)[_-]?[:=]\s*['\"]?([a-zA-Z0-9_-]{16,})['\"]?'''
           
           [[rules]]
           id = "private-key"
