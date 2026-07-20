@@ -39,6 +39,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -107,6 +109,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -245,6 +249,8 @@ jobs:
   security-updates:
     name: Security-focused Updates
     runs-on: ubuntu-latest
+    outputs:
+      security_updates_needed: ${{ steps.check-advisories.outputs.security_updates_needed }}
     
     steps:
       - name: Checkout code
@@ -254,6 +260,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -269,6 +277,7 @@ jobs:
         run: cargo audit --update
 
       - name: Check for security advisories
+        id: check-advisories
         run: |
           cargo audit --json > security-advisories.json || true
           
@@ -279,6 +288,7 @@ jobs:
           
           if [[ "$VULN_COUNT" -gt 0 ]]; then
             echo "SECURITY_UPDATES_NEEDED=true" >> $GITHUB_ENV
+            echo "security_updates_needed=true" >> "$GITHUB_OUTPUT"
             
             # Generate security update report
             echo "# Security Update Report" > security-update-report.md
@@ -291,6 +301,7 @@ jobs:
             echo '```' >> security-update-report.md
           else
             echo "SECURITY_UPDATES_NEEDED=false" >> $GITHUB_ENV
+            echo "security_updates_needed=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Attempt automatic security fixes
@@ -510,6 +521,8 @@ jobs:
     needs: [check-outdated, update-cargo-deps, security-updates, update-node-deps]
     runs-on: ubuntu-latest
     if: always()
+    env:
+      SECURITY_STATUS: ${{ needs.security-updates.outputs.security_updates_needed == 'true' && 'Action required' || 'Secure' }}
     
     steps:
       - name: Generate summary
@@ -541,4 +554,4 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Successful tasks: $SUCCESS_COUNT/4" >> $GITHUB_STEP_SUMMARY
           echo "- 🔍 Dependencies checked: ${{ needs.check-outdated.outputs.has_updates == 'true' && 'Updates found' || 'Up to date' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔒 Security status: ${{ env.SECURITY_UPDATES_NEEDED == 'true' && 'Action required' || 'Secure' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Security status: $SECURITY_STATUS" >> $GITHUB_STEP_SUMMARY

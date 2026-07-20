@@ -21,7 +21,7 @@ This directory contains the complete CI/CD pipeline for the ThreatFlux Package S
 
 ### Comprehensive Testing (< 8 min)
 - 🔧 **Multi-platform**: Ubuntu, Windows, macOS
-- 🦀 **Multi-Rust**: stable, beta, MSRV (1.75.0), nightly
+- 🦀 **Multi-Rust**: stable, beta, MSRV (1.95.0), nightly
 - 📦 **Feature Testing**: Library features tested individually
 - 🧪 **Integration tests**: Library integration and comprehensive tests
 - 📊 **Performance**: Benchmarking on PRs

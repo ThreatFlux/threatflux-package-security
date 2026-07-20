@@ -46,6 +46,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -63,9 +65,6 @@ jobs:
         env:
           RUSTDOCFLAGS: >
             --cfg docsrs
-            --extern-html-root-url tokio=https://docs.rs/tokio/1/
-            --extern-html-root-url serde=https://docs.rs/serde/1/
-            --extern-html-root-url anyhow=https://docs.rs/anyhow/1/
 
       - name: Add index page
         run: |
@@ -281,6 +280,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -316,7 +317,7 @@ jobs:
           echo "- Documented library: $DOC_COUNT" >> doc_report.md
           
           # Check for examples
-          EXAMPLE_COUNT=$(find . -name "*.rs" -exec grep -l "```" {} \; | wc -l)
+          EXAMPLE_COUNT=$(find . -name "*.rs" -exec grep -l '```' {} \; | wc -l)
           echo "- Files with code examples: $EXAMPLE_COUNT" >> doc_report.md
           
           # Check README
