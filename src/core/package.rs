@@ -3,7 +3,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use super::{DependencyAnalysis, MaliciousPattern, RiskAssessment, Vulnerability};
@@ -83,7 +83,7 @@ pub trait PackageInfo: Send + Sync {
     fn package_type(&self) -> &str;
 
     /// Get custom attributes specific to this package type
-    fn custom_attributes(&self) -> HashMap<String, serde_json::Value>;
+    fn custom_attributes(&self) -> BTreeMap<String, serde_json::Value>;
 
     /// Get package name (convenience method)
     fn name(&self) -> &str {
@@ -102,11 +102,23 @@ pub trait AnalysisResult: Send + Sync {
     /// Get dependency analysis
     fn dependency_analysis(&self) -> &DependencyAnalysis;
 
-    /// Get detected vulnerabilities
+    /// Get the deterministic, deduplicated union of advisory matches for the
+    /// analyzed subject package and its dependencies.
     fn vulnerabilities(&self) -> &[Vulnerability];
 
-    /// Get detected malicious patterns
+    /// Get advisory matches for the analyzed subject package itself. An empty
+    /// slice means none were matched or the analyzer has no subject advisory
+    /// capability.
+    fn subject_vulnerabilities(&self) -> &[Vulnerability] {
+        &[]
+    }
+
+    /// Get heuristic pattern matches (the method name is retained for compatibility).
     fn malicious_patterns(&self) -> &[MaliciousPattern];
+
+    /// Advisory database coverage/provenance for this analysis, when one was
+    /// consulted.
+    fn vulnerability_database_metadata(&self) -> Option<&super::DatabaseMetadata>;
 
     /// Convert to JSON representation
     fn to_json(&self) -> Result<serde_json::Value>;
@@ -131,9 +143,9 @@ pub trait AnalysisResult: Send + Sync {
             .unwrap_or(0.0)
     }
 
-    /// Get quality metrics (placeholder)
-    fn quality_metrics(&self) -> super::QualityMetrics {
-        super::QualityMetrics::default()
+    /// Get computed quality metrics, when an analyzer supports them.
+    fn quality_metrics(&self) -> Option<super::QualityMetrics> {
+        None
     }
 
     /// Get typosquatting risk (default implementation)
@@ -151,7 +163,11 @@ pub trait PackageAnalyzer: Send + Sync {
     /// The analysis result type
     type Analysis: AnalysisResult;
 
-    /// Analyze a package from the given path
+    /// Analyze a package from the given path.
+    ///
+    /// The returned future must be polled from an active Tokio runtime. The
+    /// implementation returns an error instead of panicking when no runtime is
+    /// active.
     async fn analyze(&self, path: &Path) -> Result<Self::Analysis>;
 
     /// Check if this analyzer can handle the given path
@@ -162,39 +178,4 @@ pub trait PackageAnalyzer: Send + Sync {
 
     /// Get supported file extensions
     fn supported_extensions(&self) -> Vec<&str>;
-}
-
-/// Common package analysis options
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnalysisOptions {
-    /// Enable deep dependency analysis
-    pub analyze_dependencies: bool,
-
-    /// Check against vulnerability databases
-    pub check_vulnerabilities: bool,
-
-    /// Scan for malicious patterns
-    pub scan_malicious_patterns: bool,
-
-    /// Enable typosquatting detection
-    pub detect_typosquatting: bool,
-
-    /// Maximum dependency depth to analyze
-    pub max_dependency_depth: usize,
-
-    /// Timeout for analysis in seconds
-    pub timeout_seconds: u64,
-}
-
-impl Default for AnalysisOptions {
-    fn default() -> Self {
-        Self {
-            analyze_dependencies: true,
-            check_vulnerabilities: true,
-            scan_malicious_patterns: true,
-            detect_typosquatting: true,
-            max_dependency_depth: 5,
-            timeout_seconds: 300,
-        }
-    }
 }

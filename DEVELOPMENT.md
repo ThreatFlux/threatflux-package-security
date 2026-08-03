@@ -1,205 +1,106 @@
-# ThreatFlux Development Guide
+# Development Guide
 
-This document explains how to set up your development environment to run the same quality checks locally that are performed in CI/CD.
+This guide covers the internal structure and design constraints of ThreatFlux Package Security. Contributor workflow and review requirements are in [CONTRIBUTING.md](CONTRIBUTING.md); command-level validation is in [TESTING.md](TESTING.md).
 
-## Quick Setup
+## Toolchain
 
-1. **Run the setup script:**
-   ```bash
-   ./setup-dev-tools.sh
-   ```
-
-2. **That's it!** The script will install all necessary tools and set up pre-commit hooks.
-
-## What Gets Installed
-
-### Rust Components
-- **rustfmt** - Code formatting
-- **clippy** - Rust linter with security-focused rules
-
-### Cargo Tools
-- **cargo-audit** - Security vulnerability scanning
-- **cargo-deny** - License and dependency policy enforcement
-- **cargo-semver-checks** - Semantic versioning validation (optional)
-- **cargo-outdated** - Dependency update checking (optional)
-
-### System Dependencies
-- **libcapstone** - Disassembly engine (needed for binary-analysis)
-- **pkg-config** - Build system helper
-
-## Pre-commit Hooks
-
-The setup script installs a comprehensive pre-commit hook that runs:
-
-### 1. Code Quality Checks
-- ✅ **Format Check** - `cargo fmt --check`
-- ✅ **Linting** - `cargo clippy` with security-focused rules
-- ✅ **Build Test** - `cargo build --all-features`
-- ✅ **Unit Tests** - `cargo test --all-features`
-- ✅ **Documentation** - `cargo doc --all-features`
-
-### 2. Security Checks
-- ✅ **Vulnerability Scan** - `cargo audit`
-- ✅ **Dependency Policy** - `cargo deny check`
-- ✅ **Secret Detection** - Basic pattern matching for secrets
-- ✅ **TODO/FIXME Check** - Prevents uncommitted TODO comments
-
-### 3. Repository Health
-- ✅ **Large File Detection** - Prevents committing files >10MB
-- ✅ **License Validation** - Ensures all dependencies use approved licenses
-
-## Manual Commands
-
-You can run these checks manually at any time:
+The repository pins its stable toolchain in `rust-toolchain.toml` and tests the minimum supported Rust version (MSRV) separately. Install Rust through `rustup`, then run:
 
 ```bash
-# Format your code
-cargo fmt
-
-# Run security-focused linting
-cargo clippy --all-targets --all-features -- -D warnings
-
-# Run tests
-cargo test --all-features
-
-# Check for security vulnerabilities
-cargo audit
-
-# Validate dependencies and licenses
-cargo deny check
-
-# Build with all features
-cargo build --all-features
-
-# Generate documentation
-cargo doc --all-features --no-deps
+rustup show
+rustup component add rustfmt clippy llvm-tools-preview
+cargo fetch --locked
 ```
 
-## Bypassing Pre-commit Hooks
+Use the checked-in `Cargo.lock`. Although this repository publishes a library, the lockfile makes CI, audits, examples, and release verification reproducible.
 
-In rare cases, you may need to bypass the pre-commit hooks:
+## Architecture
 
-```bash
-# Skip pre-commit hooks for a single commit
-git commit --no-verify -m "emergency fix"
-
-# Temporarily disable pre-commit hook
-chmod -x .git/hooks/pre-commit
-
-# Re-enable pre-commit hook
-chmod +x .git/hooks/pre-commit
+```text
+src/
+├── lib.rs                 unified package detection and public re-exports
+├── analyzers/
+│   ├── npm.rs             package.json, dependencies, and scripts
+│   ├── python.rs          Python project metadata and setup signals
+│   └── java.rs            bounded ZIP-container and manifest inspection
+├── core/
+│   ├── package.rs         shared traits, metadata, and analysis results
+│   ├── dependency.rs      dependency summaries
+│   ├── patterns.rs        compiled patterns and evidence
+│   ├── risk.rs            aggregate triage scoring
+│   └── vulnerability.rs   advisory types and database trait
+├── vulnerability_db/      bundled per-ecosystem advisory baselines
+└── utils/                 version and package-name helpers
 ```
 
-## Repository-Specific Notes
+`PackageSecurityAnalyzer` routes a caller-selected path to an ecosystem analyzer. `PackageAnalyzer` and `AnalysisResult` provide the shared abstraction, while typed analyzer results retain ecosystem-specific details.
 
-### Binary Analysis Repository
-Requires system dependencies for disassembly:
-- **macOS**: `brew install capstone pkg-config`
-- **Ubuntu/Debian**: `sudo apt-get install libcapstone-dev pkg-config`
-- **CentOS/RHEL**: `sudo yum install capstone-devel pkg-config`
+## Design invariants
 
-### Package Security Repositories
-May require additional network access for vulnerability database updates.
+### Findings are evidence
 
-## Troubleshooting
+Names such as `malicious_patterns` are historical API terminology. A match means a rule observed text or metadata; it does not prove malicious intent. New APIs and documentation should prefer “signal,” “match,” or “finding” when that is accurate.
 
-### "command not found: cargo-audit"
-```bash
-cargo install cargo-audit
-```
+Every detection change should include benign near-miss tests and true-positive tests. Do not improve recall by silently turning common package syntax into high-severity findings.
 
-### "command not found: cargo-deny"
-```bash
-cargo install cargo-deny
-```
+### Untrusted work is bounded
 
-### "libcapstone not found" (Binary Analysis)
-**macOS:**
-```bash
-brew install capstone
-```
+All bytes, strings, entries, dependency declarations, and output fields derived from a package are attacker-controlled. New parsers must define and test limits before allocating or iterating. Avoid reading an entire file or expanding an archive member before its limit is known.
 
-**Linux:**
-```bash
-sudo apt-get install libcapstone-dev pkg-config
-```
+Reject symlinks for manifest-like inputs unless a future API explicitly documents a safe policy. Java archives are inspected in place; do not extract them to the filesystem.
 
-### Pre-commit Hook Not Running
-Check that the hook is executable:
-```bash
-ls -la .git/hooks/pre-commit
-chmod +x .git/hooks/pre-commit
-```
+### Analysis does not execute packages
 
-### Slow Pre-commit Checks
-The first run may be slow due to dependency compilation. Subsequent runs use cached builds and are much faster.
+Never import Python modules, invoke npm lifecycle hooks, load JVM classes, or run build tooling to obtain metadata. Static parsing that cannot answer a question should return an explicit limitation, not cross the execution boundary.
 
-You can also run individual checks:
-```bash
-# Just format and lint (fastest)
-cargo fmt --check && cargo clippy
+### Built-in data is in-memory and offline
 
-# Skip tests in pre-commit by editing .git/hooks/pre-commit
-# Comment out the test section if needed for rapid iteration
-```
+Built-in npm/Python databases are bundled and in memory; Java analysis does not consult one. Default construction and scanning must not acquire network or persistence access.
 
-## CI/CD Parity
+npm/Python analyzers can inject a `VulnerabilityDatabase`. That implementation is trusted in-process code and may perform arbitrary I/O from `metadata` or `check_package`. The analyzer deliberately does not invent timeout, retry, response-bound, cache, provenance, or cancellation policy for it. New integration behavior must preserve that explicit boundary and surface accurate `DatabaseMetadata` with results.
 
-The pre-commit hooks are designed to run the same checks as CI/CD:
+### Results are reproducible
 
-| Check | Local Command | CI/CD Workflow |
-|-------|---------------|----------------|
-| Format | `cargo fmt --check` | `cargo fmt --all -- --check` |
-| Lint | `cargo clippy` | Security-focused clippy rules |
-| Test | `cargo test` | `cargo test --all-features` |
-| Audit | `cargo audit` | Security audit workflow |
-| Deny | `cargo deny check` | Dependency validation |
-| Build | `cargo build` | Multi-target builds |
+Sort library-owned results whose source order is not meaningful. Do not expose `HashMap` or filesystem iteration order through evidence arrays, JSON, or scores. An injected vulnerability database owns the order of the records it returns and must make that order stable when reproducibility matters. Tests must not depend on wall-clock time, public services, user cache contents, or locale.
 
-## Updating Tools
+### Errors retain context without echoing hostile input
 
-Keep your tools up to date:
+Errors should identify the operation and bounded field/path context. Avoid copying arbitrarily large manifest content, control characters, or secrets into errors and logs. A failed analysis returns an error rather than a misleading partial “safe” result.
 
-```bash
-# Update Rust toolchain
-rustup update
+## Adding or changing a parser
 
-# Update cargo tools
-cargo install cargo-audit --force
-cargo install cargo-deny --force
-cargo install cargo-semver-checks --force --locked
-cargo install cargo-outdated --force
+1. Define accepted path types and format detection.
+2. Identify all reads, allocations, loops, recursion, decompression, and retained output.
+3. Add boundary constants or configuration before implementing the happy path.
+4. Reject unsupported special files and unsafe archive names early.
+5. Test empty, malformed, oversized, non-UTF-8, symlinked, and adversarial inputs.
+6. Add benign near-misses for every new security heuristic.
+7. Update [docs/BEHAVIOR.md](docs/BEHAVIOR.md) and migration notes if observable behavior changes.
 
-# Update advisory database
-cargo audit --update
-```
+## Adding a built-in pattern
 
-## Configuration Files
+Patterns live in `core::patterns` and must have a stable identifier, category, severity, bounded evidence, and focused scope. Compile regular expressions once during matcher construction.
 
-### `.clippy.toml` (if present)
-Repository-specific clippy configuration.
+Required tests include:
 
-### `deny.toml`
-Dependency and license policy configuration. See individual repositories for specific policies.
+- the intended positive case;
+- ordinary code that is lexically similar but benign;
+- case and Unicode behavior where relevant;
+- deterministic evidence order;
+- maximum evidence and input boundaries.
 
-### `.rustfmt.toml` (if present)
-Code formatting configuration.
+Changing a pattern identifier or serialized category is a compatibility change. Record it in the changelog and migration guide.
 
-## Getting Help
+## Vulnerability data
 
-- **Pre-commit issues**: Check this guide and repository issues
-- **Rust toolchain**: https://rustup.rs/
-- **Cargo tools**: Individual tool documentation
-- **CI/CD workflows**: See `.github/workflows/` in each repository
+Bundled records are testable baseline data, not a comprehensive feed. Preserve source-native advisory identity, optional CVE aliases, package ecosystem/name, CVSS source, references, coverage, as-of date, and provenance. Version comparison must follow the supported ecosystem semantics; never compare version strings lexicographically.
 
-## Contributing
+Do not add an advisory solely to make a test green. Use a synthetic database implementation in tests when testing matching behavior that does not require a real advisory.
 
-When contributing:
+## Documentation
 
-1. ✅ Ensure all pre-commit checks pass
-2. ✅ Add tests for new functionality  
-3. ✅ Update documentation as needed
-4. ✅ Follow existing code style and patterns
-5. ✅ Keep commits focused and atomic
+Public rustdoc should describe errors, resource behavior, and security semantics. README snippets must compile. Avoid claims such as “detects malware,” “complete vulnerability coverage,” or “safe package.”
 
-The pre-commit hooks help ensure code quality and consistency across all ThreatFlux repositories.
+## Release changes
+
+Do not publish routine releases from a workstation. They use the tagged workflow and crates.io trusted publishing described in [docs/RELEASING.md](docs/RELEASING.md). The only exception is the separately controlled, one-time first-publication bootstrap documented there.

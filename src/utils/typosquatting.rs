@@ -1,163 +1,128 @@
-//! Typosquatting detection utilities
+//! Deterministic, ecosystem-scoped package-name similarity heuristics.
+//!
+//! These checks are signals for review, not proof of malicious intent.
 
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use strsim::levenshtein;
 
-/// Typosquatting detector
+/// Package namespace used to select the comparison corpus.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackageEcosystem {
+    Npm,
+    Python,
+    Java,
+    All,
+}
+
+/// Typosquatting detector backed by a small built-in comparison corpus.
 pub struct TyposquattingDetector {
-    popular_packages: HashSet<String>,
+    popular_packages: BTreeSet<String>,
+    ecosystem: PackageEcosystem,
 }
 
 impl TyposquattingDetector {
-    /// Create a new typosquatting detector
+    /// Create a detector using all built-in ecosystems.
+    ///
+    /// Prefer [`Self::for_ecosystem`] when the package ecosystem is known, to
+    /// avoid cross-ecosystem false positives.
     pub fn new() -> Self {
-        let mut popular_packages = HashSet::new();
-
-        // Add popular npm packages
-        for pkg in NPM_POPULAR_PACKAGES {
-            popular_packages.insert(pkg.to_string());
-        }
-
-        // Add popular Python packages
-        for pkg in PYTHON_POPULAR_PACKAGES {
-            popular_packages.insert(pkg.to_string());
-        }
-
-        // Add popular Java packages
-        for pkg in JAVA_POPULAR_PACKAGES {
-            popular_packages.insert(pkg.to_string());
-        }
-
-        Self { popular_packages }
+        Self::for_ecosystem(PackageEcosystem::All)
     }
 
-    /// Check if a package name is likely typosquatting
+    /// Create a detector using only one ecosystem's comparison corpus.
+    pub fn for_ecosystem(ecosystem: PackageEcosystem) -> Self {
+        let packages: &[&str] = match ecosystem {
+            PackageEcosystem::Npm => NPM_POPULAR_PACKAGES,
+            PackageEcosystem::Python => PYTHON_POPULAR_PACKAGES,
+            PackageEcosystem::Java => JAVA_POPULAR_PACKAGES,
+            PackageEcosystem::All => &[],
+        };
+        let mut popular_packages = packages
+            .iter()
+            .map(|package| normalize_for_ecosystem(package, ecosystem))
+            .collect::<BTreeSet<_>>();
+        if ecosystem == PackageEcosystem::All {
+            popular_packages.extend(
+                NPM_POPULAR_PACKAGES
+                    .iter()
+                    .chain(PYTHON_POPULAR_PACKAGES)
+                    .chain(JAVA_POPULAR_PACKAGES)
+                    .map(|package| (*package).to_string()),
+            );
+        }
+        Self {
+            popular_packages,
+            ecosystem,
+        }
+    }
+
+    /// Check whether a package name is suspiciously close to the built-in corpus.
     pub fn is_typosquatting(&self, package_name: &str) -> bool {
-        // Check for common typosquatting patterns
-        if self.has_suspicious_suffix(package_name) || self.has_suspicious_prefix(package_name) {
-            return true;
+        let package_name = normalize_for_ecosystem(package_name, self.ecosystem);
+        if package_name.is_empty() || self.popular_packages.contains(&package_name) {
+            return false;
         }
 
-        // Check similarity to popular packages
-        for popular in &self.popular_packages {
-            let distance = levenshtein(package_name, popular);
-            if distance > 0 && distance <= 2 {
-                return true;
-            }
-
-            // Check for character substitution
-            if self.is_character_substitution(package_name, popular) {
-                return true;
-            }
-        }
-
-        false
+        self.suspicious_affix_base(&package_name).is_some()
+            || self.popular_packages.iter().any(|popular| {
+                let distance = levenshtein(&package_name, popular);
+                distance > 0 && distance <= similarity_threshold(popular.chars().count())
+            })
     }
 
-    /// Find similar popular packages
+    /// Find similar corpus names, ordered by edit distance and then name.
     pub fn find_similar(&self, package_name: &str) -> Vec<String> {
-        let mut similar = Vec::new();
-
-        for popular in &self.popular_packages {
-            let distance = levenshtein(package_name, popular);
-            if distance > 0 && distance <= 3 {
-                similar.push(popular.clone());
-            }
+        let package_name = normalize_for_ecosystem(package_name, self.ecosystem);
+        let mut similar = self
+            .popular_packages
+            .iter()
+            .filter_map(|popular| {
+                let distance = levenshtein(&package_name, popular);
+                (distance > 0 && distance <= 3).then(|| (distance, popular.clone()))
+            })
+            .collect::<Vec<_>>();
+        if let Some(base) = self.suspicious_affix_base(&package_name)
+            && !similar.iter().any(|(_, candidate)| candidate == base)
+        {
+            similar.push((levenshtein(&package_name, base), base.to_string()));
         }
-
-        similar
+        similar.sort();
+        similar.into_iter().map(|(_, name)| name).collect()
     }
 
-    /// Check for suspicious suffixes
-    fn has_suspicious_suffix(&self, name: &str) -> bool {
-        const SUSPICIOUS_SUFFIXES: &[&str] = &[
+    fn suspicious_affix_base<'a>(&'a self, name: &'a str) -> Option<&'a str> {
+        const SUFFIXES: &[&str] = &[
             "-dev",
             "-test",
             "-beta",
             "-alpha",
             "-rc",
             "-snapshot",
-            "js",
-            "-js",
-            "2",
             "-official",
             "-real",
             "-new",
         ];
+        const PREFIXES: &[&str] = &["fake-", "new-", "real-", "official-"];
 
-        for suffix in SUSPICIOUS_SUFFIXES {
-            if let Some(base) = name.strip_suffix(suffix) {
-                // Check if removing suffix matches a popular package
-                if self.popular_packages.contains(base) {
-                    return true;
-                }
-            }
-        }
-
-        false
+        SUFFIXES
+            .iter()
+            .find_map(|suffix| name.strip_suffix(suffix))
+            .or_else(|| PREFIXES.iter().find_map(|prefix| name.strip_prefix(prefix)))
+            .filter(|base| self.popular_packages.contains(*base))
     }
+}
 
-    /// Check for suspicious prefixes
-    fn has_suspicious_prefix(&self, name: &str) -> bool {
-        const SUSPICIOUS_PREFIXES: &[&str] =
-            &["fake-", "test-", "my-", "new-", "real-", "official-"];
-
-        for prefix in SUSPICIOUS_PREFIXES {
-            if let Some(base) = name.strip_prefix(prefix) {
-                if self.popular_packages.contains(base) {
-                    return true;
-                }
-            }
-        }
-
-        false
+fn normalize_for_ecosystem(name: &str, ecosystem: PackageEcosystem) -> String {
+    match ecosystem {
+        PackageEcosystem::Python => crate::utils::package_name::python(name),
+        PackageEcosystem::Npm => crate::utils::package_name::npm(name),
+        PackageEcosystem::Java => crate::utils::package_name::java(name),
+        PackageEcosystem::All => name.trim().to_lowercase(),
     }
+}
 
-    /// Check for single character substitution
-    fn is_character_substitution(&self, name1: &str, name2: &str) -> bool {
-        if name1.len() != name2.len() {
-            return false;
-        }
-
-        let chars1: Vec<char> = name1.chars().collect();
-        let chars2: Vec<char> = name2.chars().collect();
-        let mut differences = 0;
-
-        for (c1, c2) in chars1.iter().zip(chars2.iter()) {
-            if c1 != c2 {
-                differences += 1;
-                if differences > 1 {
-                    return false;
-                }
-
-                // Check for common visual confusions
-                if !self.is_visual_confusion(*c1, *c2) {
-                    return true;
-                }
-            }
-        }
-
-        differences == 1
-    }
-
-    /// Check for visually similar characters
-    fn is_visual_confusion(&self, c1: char, c2: char) -> bool {
-        matches!(
-            (c1, c2),
-            ('0', 'o')
-                | ('o', '0')
-                | ('0', 'O')
-                | ('O', '0')
-                | ('1', 'l')
-                | ('l', '1')
-                | ('1', 'I')
-                | ('I', '1')
-                | ('5', 's')
-                | ('s', '5')
-                | ('5', 'S')
-                | ('S', '5')
-        )
-    }
+fn similarity_threshold(character_count: usize) -> usize {
+    if character_count >= 7 { 2 } else { 1 }
 }
 
 impl Default for TyposquattingDetector {
@@ -166,7 +131,6 @@ impl Default for TyposquattingDetector {
     }
 }
 
-// Popular NPM packages
 const NPM_POPULAR_PACKAGES: &[&str] = &[
     "react",
     "express",
@@ -191,7 +155,6 @@ const NPM_POPULAR_PACKAGES: &[&str] = &[
     "commander",
 ];
 
-// Popular Python packages
 const PYTHON_POPULAR_PACKAGES: &[&str] = &[
     "numpy",
     "pandas",
@@ -214,7 +177,6 @@ const PYTHON_POPULAR_PACKAGES: &[&str] = &[
     "opencv-python",
 ];
 
-// Popular Java packages
 const JAVA_POPULAR_PACKAGES: &[&str] = &[
     "spring-core",
     "spring-boot",
@@ -234,3 +196,31 @@ const JAVA_POPULAR_PACKAGES: &[&str] = &[
     "jetty",
     "tomcat",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exact_popular_names_are_not_flagged() {
+        let detector = TyposquattingDetector::for_ecosystem(PackageEcosystem::Npm);
+        assert!(!detector.is_typosquatting("React"));
+    }
+
+    #[test]
+    fn results_are_ecosystem_scoped_and_deterministic() {
+        let npm = TyposquattingDetector::for_ecosystem(PackageEcosystem::Npm);
+        let python = TyposquattingDetector::for_ecosystem(PackageEcosystem::Python);
+        assert!(npm.is_typosquatting("loadash"));
+        assert!(!python.is_typosquatting("loadash"));
+        assert_eq!(npm.find_similar("loadash"), vec!["lodash"]);
+        assert!(!python.is_typosquatting("scikit_learn"));
+    }
+
+    #[test]
+    fn suspicious_affix_returns_the_comparison_target() {
+        let detector = TyposquattingDetector::for_ecosystem(PackageEcosystem::Npm);
+        assert!(detector.is_typosquatting("official-react"));
+        assert_eq!(detector.find_similar("official-react"), vec!["react"]);
+    }
+}

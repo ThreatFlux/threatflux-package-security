@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 💬 Discussions
-    url: https://github.com/ThreatFlux/threatflux-package-security/discussions
-    about: Ask questions and discuss ideas with the community
-  - name: 🔒 Security Issues
-    url: mailto:security@threatflux.com
-    about: Report security vulnerabilities privately via email
+  - name: Private security report
+    url: https://github.com/ThreatFlux/threatflux-package-security/security/advisories/new
+    about: Report vulnerabilities and sensitive security issues privately.
+  - name: Usage question
+    url: https://github.com/ThreatFlux/threatflux-package-security/issues/new?template=question.yml
+    about: If documentation is unclear, open an issue without sensitive package data.
