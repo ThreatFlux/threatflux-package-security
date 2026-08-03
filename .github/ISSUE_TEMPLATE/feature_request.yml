@@ -1,133 +1,77 @@
-name: ✨ Feature Request
-description: Suggest a new feature or enhancement
-title: "[Feature] "
-labels: ["enhancement", "needs-triage"]
-assignees: []
-
+name: Feature request
+description: Propose a focused capability or behavior change
+title: "proposal: "
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for suggesting a new feature! Please provide as much detail as possible to help us understand your request.
+        Describe the security-analysis use case, not only a preferred implementation. Large API, parser, scoring, advisory-data, or network changes should begin here.
 
   - type: checkboxes
-    id: prerequisites
+    id: checks
     attributes:
-      label: Prerequisites
-      description: Before submitting, please verify the following
+      label: Pre-flight checks
       options:
-        - label: I have searched existing issues to ensure this feature hasn't been requested
+        - label: I searched existing issues and documentation.
           required: true
-        - label: I have read the documentation to ensure this feature doesn't already exist
+        - label: This can be discussed publicly and contains no sensitive vulnerability details.
           required: true
-        - label: This feature would be useful to other users, not just my specific use case
-          required: true
-
-  - type: dropdown
-    id: feature-type
-    attributes:
-      label: Feature Type
-      description: What type of feature are you requesting?
-      options:
-        - New analysis capability
-        - Performance improvement
-        - CLI enhancement
-        - MCP server enhancement
-        - Output format improvement
-        - Integration with external tools
-        - Security enhancement
-        - Documentation improvement
-        - Other
-    validations:
-      required: true
 
   - type: textarea
     id: problem
     attributes:
-      label: Problem Statement
-      description: What problem does this feature solve? Is your feature request related to a problem?
-      placeholder: |
-        I'm always frustrated when...
-        Currently, there's no way to...
-        It would be helpful if...
+      label: Problem
+      description: Who is affected, what workflow is blocked, and why existing behavior is insufficient?
     validations:
       required: true
 
   - type: textarea
-    id: solution
+    id: proposal
     attributes:
-      label: Proposed Solution
-      description: Describe the solution you'd like to see implemented
-      placeholder: |
-        I would like to see...
-        The feature should work by...
-        It could be implemented as...
+      label: Proposed behavior
+      description: Define observable inputs, outputs, errors, and compatibility expectations.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - npm analysis
+        - Python analysis
+        - Java archive analysis
+        - Vulnerability data and version matching
+        - Patterns and name similarity
+        - Risk model and result types
+        - Performance and resource limits
+        - Documentation and developer experience
+        - CI, security, or releases
+    validations:
+      required: true
+
+  - type: textarea
+    id: security
+    attributes:
+      label: Security and resource considerations
+      description: Address untrusted input, network/cache behavior, execution boundaries, worst-case work, and false positives/negatives.
     validations:
       required: true
 
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternatives Considered
-      description: Describe any alternative solutions or features you've considered
-      placeholder: |
-        I also considered...
-        Another approach could be...
-        Existing tools do this by...
+      label: Alternatives considered
+      description: Include application-level workarounds or narrower designs.
 
   - type: textarea
-    id: use-cases
+    id: compatibility
     attributes:
-      label: Use Cases
-      description: Provide specific use cases where this feature would be beneficial
-      placeholder: |
-        Use case 1: Security analysts could...
-        Use case 2: Researchers could...
-        Use case 3: Automation tools could...
-    validations:
-      required: true
-
-  - type: dropdown
-    id: priority
-    attributes:
-      label: Priority
-      description: How important is this feature to you?
-      options:
-        - Low - Nice to have
-        - Medium - Would be helpful
-        - High - Important for my workflow
-        - Critical - Blocking my use case
-    validations:
-      required: true
-
-  - type: textarea
-    id: implementation
-    attributes:
-      label: Implementation Ideas
-      description: Do you have any ideas on how this could be implemented?
-      placeholder: |
-        This could be implemented by...
-        It might require changes to...
-        Similar features exist in...
-
-  - type: checkboxes
-    id: contribution
-    attributes:
-      label: Contribution
-      description: Are you willing to contribute to this feature?
-      options:
-        - label: I'm willing to help implement this feature
-        - label: I can provide testing and feedback
-        - label: I can help with documentation
-        - label: I can provide example files or test cases
+      label: Compatibility impact
+      description: Note public API, serialized data, pattern identifiers, scoring, and MSRV effects.
 
   - type: textarea
     id: additional
     attributes:
-      label: Additional Context
-      description: Any other context, screenshots, mockups, or examples
-      placeholder: |
-        - Links to similar features in other tools
-        - Screenshots or mockups
-        - Example command-line interfaces
-        - References to relevant standards or specifications
+      label: Additional context
+      description: Link public specifications or small synthetic examples.

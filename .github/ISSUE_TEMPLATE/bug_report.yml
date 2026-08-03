@@ -1,130 +1,91 @@
-name: 🐛 Bug Report
-description: Report a bug or unexpected behavior
-title: "[Bug] "
-labels: ["bug", "needs-triage"]
-assignees: []
-
+name: Bug report
+description: Report reproducible incorrect or unexpected behavior
+title: "bug: "
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this bug report! Please provide as much detail as possible.
+        Thanks for reporting a problem. Do not include private packages, credentials, live malware, or undisclosed vulnerabilities. Report security issues through the private channel in SECURITY.md.
 
   - type: checkboxes
-    id: prerequisites
+    id: checks
     attributes:
-      label: Prerequisites
-      description: Before submitting, please verify the following
+      label: Pre-flight checks
       options:
-        - label: I have searched existing issues to ensure this bug hasn't been reported
+        - label: I searched existing issues for this problem.
           required: true
-        - label: I am using the latest version of the file scanner
+        - label: I can reproduce this on a supported version or current `main`.
           required: true
-        - label: I have read the documentation
+        - label: This report does not contain sensitive security information.
           required: true
 
-  - type: textarea
-    id: description
+  - type: input
+    id: version
     attributes:
-      label: Bug Description
-      description: A clear and concise description of what the bug is
-      placeholder: Describe the bug...
+      label: Crate version or commit
+      placeholder: "Full commit SHA or published version"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ecosystem
+    attributes:
+      label: Input ecosystem
+      options:
+        - npm directory
+        - Python directory
+        - Java archive
+        - Custom pattern or database
+        - Not input-specific
     validations:
       required: true
 
   - type: textarea
     id: reproduction
     attributes:
-      label: Steps to Reproduce
-      description: Detailed steps to reproduce the behavior
-      placeholder: |
-        1. Run command: `./file-scanner ...`
-        2. Use these options: `...`
-        3. Observe the error: `...`
+      label: Minimal reproduction
+      description: Use synthetic input and include the smallest code sample that reproduces the problem.
+      render: rust
+    validations:
+      required: true
+
+  - type: textarea
+    id: input_shape
+    attributes:
+      label: Input shape
+      description: Describe relevant file names, approximate byte sizes, archive entry counts, and metadata without attaching sensitive artifacts.
+      placeholder: "package.json: 2 KiB; 4 direct dependencies; no symlinks"
     validations:
       required: true
 
   - type: textarea
     id: expected
     attributes:
-      label: Expected Behavior
-      description: What you expected to happen
-      placeholder: Describe what should have happened...
+      label: Expected behavior
     validations:
       required: true
 
   - type: textarea
     id: actual
     attributes:
-      label: Actual Behavior
-      description: What actually happened (include error messages)
-      placeholder: |
-        Error message or unexpected output:
-        ```
-        paste error here
-        ```
+      label: Actual behavior
+      description: Include the complete bounded error or finding output. Remove secrets and private paths.
     validations:
       required: true
-
-  - type: input
-    id: version
-    attributes:
-      label: File Scanner Version
-      description: What version of the file scanner are you using?
-      placeholder: "v1.0.0 or commit hash"
-    validations:
-      required: true
-
-  - type: dropdown
-    id: os
-    attributes:
-      label: Operating System
-      description: What operating system are you using?
-      options:
-        - Linux
-        - macOS
-        - Windows
-        - Other (specify in additional context)
-    validations:
-      required: true
-
-  - type: input
-    id: rust-version
-    attributes:
-      label: Rust Version
-      description: What version of Rust are you using? (run `rustc --version`)
-      placeholder: "rustc 1.87.0 (e4ff1013a 2025-04-21)"
 
   - type: textarea
-    id: file-info
+    id: environment
     attributes:
-      label: File Information
-      description: Information about the file being analyzed (if applicable)
+      label: Environment
       placeholder: |
-        - File type: (e.g., ELF binary, PE executable, text file)
-        - File size: (approximate)
-        - File format: (if known)
-        - Can you share the file? (yes/no)
-
-  - type: textarea
-    id: logs
-    attributes:
-      label: Debug Output
-      description: Run with verbose logging and paste relevant output
-      placeholder: |
-        Run: `RUST_LOG=debug ./file-scanner [options]`
-        
-        ```
-        paste debug output here
-        ```
+        OS: Ubuntu 24.04
+        rustc: 1.x.y
+        dependency source: git <full SHA> or crates.io <version>
+    validations:
+      required: true
 
   - type: textarea
     id: additional
     attributes:
-      label: Additional Context
-      description: Any other context about the problem
-      placeholder: |
-        - Configuration details
-        - Related issues
-        - Screenshots (if applicable)
-        - Workarounds you've tried
+      label: Additional context
+      description: Note regressions, workarounds, or related issues.

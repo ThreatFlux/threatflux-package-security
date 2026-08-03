@@ -12,7 +12,10 @@ pub use package::{
     TyposquattingRisk,
 };
 pub use patterns::{MaliciousPattern, PatternDatabase, PatternMatcher};
-pub use risk::{RiskAssessment, RiskCalculator, RiskLevel, RiskScore, SecurityPosture};
+pub use risk::{
+    RiskAssessment, RiskCalculator, RiskLevel, RiskScore, SecurityPosture, SupplyChainSignal,
+};
 pub use vulnerability::{
-    DatabaseStatistics, UpdateResult, Vulnerability, VulnerabilityDatabase, VulnerabilitySeverity,
+    AdvisoryCatalog, DatabaseCoverage, DatabaseMetadata, DatabaseStatistics, Vulnerability,
+    VulnerabilityDatabase, VulnerabilitySeverity,
 };

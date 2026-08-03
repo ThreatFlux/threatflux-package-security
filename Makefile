@@ -1,90 +1,71 @@
-# ThreatFlux Package Security Library Makefile
-# Provides consistent build, test, and quality commands across all ThreatFlux libraries
+.DEFAULT_GOAL := help
 
-.PHONY: help build test check fmt clippy clean doc bench examples install release pre-commit all
+MSRV := 1.95.0
+STABLE := 1.97.1
+MARKDOWN_TARGET_DIR := target/markdown-doctests
 
-# Default target
-all: fmt clippy test build
+.PHONY: help fmt fmt-check check lint test test-doc markdown msrv-check docs examples
+.PHONY: coverage audit deny package publish-dry-run ci clean
 
-# Help target
-help:
-	@echo "ThreatFlux Package Security Library - Available targets:"
-	@echo ""
-	@echo "  Build targets:"
-	@echo "    build          - Build the library in debug mode"
-	@echo "    release        - Build the library in release mode"
-	@echo "    check          - Fast compilation check without optimization"
-	@echo ""
-	@echo "  Quality targets:"
-	@echo "    fmt            - Format code with rustfmt"
-	@echo "    clippy         - Run clippy lints"
-	@echo "    test           - Run all tests"
-	@echo "    bench          - Run benchmarks (when available)"
-	@echo "    doc            - Generate documentation"
-	@echo ""
-	@echo "  Maintenance targets:"
-	@echo "    clean          - Clean build artifacts"
-	@echo "    install        - Install from source"
-	@echo "    examples       - Run all examples"
-	@echo "    pre-commit     - Run pre-commit checks (fmt + clippy + test)"
-	@echo ""
-	@echo "  Meta targets:"
-	@echo "    all            - Run fmt + clippy + test + build"
-	@echo "    help           - Show this help message"
+help: ## Show available commands
+	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make <target>\n\n"} /^[a-zA-Z_-]+:.*##/ {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-# Build targets
-build:
-	@echo "🔨 Building threatflux-package-security..."
-	cargo build
+fmt: ## Format Rust sources
+	cargo fmt --all
 
-release:
-	@echo "🚀 Building threatflux-package-security in release mode..."
-	cargo build --release
+fmt-check: ## Check Rust formatting
+	cargo fmt --all -- --check
 
-check:
-	@echo "✅ Checking threatflux-package-security compilation..."
-	cargo check
+check: ## Check all targets and features
+	cargo check --all-targets --all-features --locked
 
-# Quality targets
-fmt:
-	@echo "🎨 Formatting threatflux-package-security code..."
-	cargo fmt
+lint: ## Run strict Clippy checks
+	cargo clippy --all-targets --all-features --locked -- -D warnings
 
-clippy:
-	@echo "📎 Running clippy on threatflux-package-security..."
-	cargo clippy -- -D warnings
+test: ## Run the complete test suite
+	cargo test --all-targets --all-features --locked
 
-test:
-	@echo "🧪 Running threatflux-package-security tests..."
-	cargo test
+test-doc: ## Run crate documentation tests
+	cargo test --doc --all-features --locked
 
-bench:
-	@echo "⚡ Benchmarks not yet implemented for threatflux-package-security"
-
-doc:
-	@echo "📚 Generating threatflux-package-security documentation..."
-	cargo doc --no-deps --open
-
-# Maintenance targets
-clean:
-	@echo "🧹 Cleaning threatflux-package-security build artifacts..."
-	cargo clean
-
-install:
-	@echo "📦 Installing threatflux-package-security..."
-	cargo install --path .
-
-examples:
-	@echo "💡 Running threatflux-package-security examples..."
-	@for example in $$(cargo run --example 2>&1 | grep -E "^\s+" | awk '{print $$1}'); do \
-		echo "Running example: $$example"; \
-		cargo run --example $$example; \
+markdown: ## Compile Rust blocks in README and guides
+	CARGO_TARGET_DIR=$(MARKDOWN_TARGET_DIR) cargo +$(STABLE) build --all-features --examples --locked
+	@set -eu; \
+	rlib=$$(ls -t $(MARKDOWN_TARGET_DIR)/debug/deps/libthreatflux_package_security-*.rlib | head -n 1); \
+	tokio_rlib=$$(ls -t $(MARKDOWN_TARGET_DIR)/debug/deps/libtokio-*.rlib | head -n 1); \
+	for document in README.md $$(find docs -type f -name '*.md' -print 2>/dev/null | sort); do \
+		rustup run $(STABLE) rustdoc --test "$$document" --edition 2024 \
+			--extern threatflux_package_security="$$rlib" \
+			--extern tokio="$$tokio_rlib" \
+			-L dependency=$(MARKDOWN_TARGET_DIR)/debug/deps; \
 	done
 
-# Pre-commit checks
-pre-commit: fmt clippy test
-	@echo "✅ All pre-commit checks passed for threatflux-package-security!"
+msrv-check: ## Check and test with the minimum Rust version
+	cargo +$(MSRV) check --all-targets --all-features --locked
+	cargo +$(MSRV) test --all-targets --all-features --locked
 
-# Development workflow
-dev: fmt clippy test build
-	@echo "🎯 Development cycle complete for threatflux-package-security!"
+docs: ## Build documentation with warnings denied
+	RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps --locked
+
+examples: ## Build all examples
+	cargo build --examples --all-features --locked
+
+coverage: ## Generate an LCOV coverage report with cargo-llvm-cov
+	cargo llvm-cov --all-features --workspace --locked --lcov --output-path lcov.info
+
+audit: ## Check RustSec advisories
+	cargo audit --deny warnings
+
+deny: ## Check dependency and license policy
+	cargo deny check
+
+package: ## Build and verify the crates.io package
+	cargo package --allow-dirty --locked
+
+publish-dry-run: ## Validate crates.io publication without uploading
+	cargo publish --dry-run --allow-dirty --locked
+
+ci: fmt-check check lint test test-doc markdown msrv-check docs examples audit deny package ## Run local release gates
+
+clean: ## Remove Cargo build output
+	cargo clean

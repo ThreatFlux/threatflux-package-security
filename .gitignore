@@ -3,9 +3,6 @@
 **/*.rs.bk
 *.pdb
 
-# Cargo.lock should be ignored for library crates
-Cargo.lock
-
 # IDE and editor files
 .vscode/
 .idea/
@@ -51,6 +48,8 @@ docs/_build/
 # Environment files
 .env
 .env.local
+.env.*
+!.env.example
 
 # Log files
 *.log

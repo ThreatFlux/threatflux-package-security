@@ -1,0 +1,64 @@
+name: Usage question
+description: Ask about documented package-analysis behavior or integration
+title: "question: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask a focused, reproducible question. Do not include private packages, credentials, live malware, or undisclosed vulnerabilities. Use private vulnerability reporting for sensitive security information.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I searched the README, behavior guide, and existing issues.
+          required: true
+        - label: This question contains no sensitive package or vulnerability data.
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Crate version or commit
+      placeholder: "Full commit SHA or published version"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Unified analyzer
+        - npm analysis
+        - Python analysis
+        - Java archive analysis
+        - Vulnerability database integration
+        - Patterns and risk results
+        - Build, test, or documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: Describe the goal, relevant API, and the specific point that is unclear.
+    validations:
+      required: true
+
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What you tried
+      description: Include a minimal synthetic code sample or documentation link where useful.
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Relevant environment
+      placeholder: |
+        OS: Ubuntu 24.04
+        rustc: 1.x.y
+        dependency source: git <full SHA> or crates.io <version>

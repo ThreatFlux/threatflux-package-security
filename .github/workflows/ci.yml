@@ -2,304 +2,173 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main]
   pull_request:
-    branches: [ main, develop ]
-  workflow_call:
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  RUST_STABLE: 1.97.1
 
 jobs:
-  # Fast checks that run first to provide quick feedback
-  quick-checks:
-    name: Quick Checks
+  quality:
+    name: Format, lint, docs, and package
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Checkout code
-        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.0
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          components: rustfmt, clippy
+          persist-credentials: false
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+      - name: Install Rust
+        run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+
+      - name: Cache Cargo data
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          key: quick-checks
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-${{ env.RUST_STABLE }}-${{ hashFiles('Cargo.lock') }}
+
+      - name: Install workflow linter
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        shell: bash
+        run: |
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          destination="${RUNNER_TEMP}/${archive}"
+          curl --fail --silent --show-error --location --retry 3 \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}" \
+            --output "$destination"
+          echo "${ACTIONLINT_SHA256}  ${destination}" | sha256sum --check --strict
+          tar -xzf "$destination" -C "$RUNNER_TEMP" actionlint
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Lint GitHub Actions workflows
+        run: actionlint
 
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Check clippy (deny warnings)
-        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Lint all targets and features
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
 
-      - name: Check documentation
-        run: cargo doc --all-features --no-deps --document-private-items
+      - name: Build documentation
         env:
-          RUSTDOCFLAGS: "-D warnings"
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --all-features --no-deps --locked
 
-  # Comprehensive testing across platforms and Rust versions
+      - name: Test documentation examples
+        run: cargo test --doc --all-features --locked
+
+      - name: Compile Markdown examples
+        run: make markdown
+
+      - name: Verify crate package
+        run: cargo package --locked
+
+  msrv:
+    name: MSRV (1.95.0)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        run: rustup toolchain install 1.95.0 --profile minimal
+
+      - name: Test all targets and features
+        # The explicit +toolchain bypasses the repository's stable override.
+        run: cargo +1.95.0 test --all-targets --all-features --locked
+
+  features:
+    name: Minimal features
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        run: rustup toolchain install 1.97.1 --profile minimal
+
+      - name: Test without default features
+        run: cargo test --all-targets --no-default-features --locked
+
   test:
-    name: Test Suite
-    needs: quick-checks
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        rust: [stable, beta, 1.95.0] # MSRV
-        include:
-          - os: ubuntu-latest
-            rust: nightly
-            experimental: true
-    
+    name: Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.experimental == true }}
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.0
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: test-${{ matrix.os }}-${{ matrix.rust }}
-
-      - name: Install system dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev
-
-      - name: Install system dependencies (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install pkg-config openssl
-
-      - name: Build library
-        run: cargo build --all-features
-
-      - name: Run library tests
-        run: cargo test --all-features --verbose
-
-      - name: Run doctests
-        run: cargo test --doc --all-features
-
-  # Feature testing
-  feature-tests:
-    name: Feature Tests
-    needs: quick-checks
-    runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        features: 
-          - default
-          - concurrent
-          - offline
-          - "concurrent,offline"
-        
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.0
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          toolchain: 1.95.0
+          persist-credentials: false
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+      - name: Install Rust
+        run: rustup toolchain install 1.97.1 --profile minimal
+
+      - name: Cache Cargo data
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          key: feature-test-${{ matrix.features }}
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-${{ env.RUST_STABLE }}-${{ hashFiles('Cargo.lock') }}
 
-      - name: Test with features
-        run: cargo test --features "${{ matrix.features }}" --verbose
+      - name: Run all-feature tests
+        run: cargo test --all-targets --all-features --locked
 
-  # Integration testing
-  integration-tests:
-    name: Integration Tests
-    needs: [test, feature-tests]
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.0
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.95.0
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: integration-tests
-
-      - name: Run integration tests
-        run: cargo test --test integration_test --all-features --verbose
-
-      - name: Run comprehensive tests
-        run: cargo test --test comprehensive_test --all-features --verbose
-
-  # Performance benchmarks
-  benchmarks:
-    name: Performance Benchmarks
-    needs: quick-checks
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.0
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.95.0
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: benchmarks
-
-      - name: Run benchmarks
-        run: |
-          # Run benchmarks if they exist
-          if cargo bench --help >/dev/null 2>&1; then
-            cargo bench 2>&1 | tee benchmark_results.txt
-          else
-            echo "No benchmarks found" | tee benchmark_results.txt
-          fi
-
-      - name: Upload benchmark results
-        if: always()
-        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
-        with:
-          name: benchmark-results
-          path: benchmark_results.txt
-          if-no-files-found: ignore
-
-  # Code coverage
   coverage:
-    name: Code Coverage
-    needs: quick-checks
+    name: Coverage
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 30
     steps:
-      - name: Checkout code
-        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.0
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          components: llvm-tools-preview
+          persist-credentials: false
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: coverage
+      - name: Install Rust
+        run: rustup toolchain install 1.97.1 --profile minimal --component llvm-tools-preview
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@v2
+        # This pinned installer commit also pins tool versions and checksums.
+        uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
         with:
           tool: cargo-llvm-cov
 
-      - name: Generate coverage report
-        run: cargo llvm-cov --all-features --lcov --output-path lcov.info
+      - name: Generate coverage
+        run: cargo llvm-cov --workspace --all-features --locked --lcov --output-path lcov.info
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          file: lcov.info
-          flags: unittests
-          name: codecov-umbrella
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-
-  # Library verification across platforms
-  cross-platform-verify:
-    name: Cross-Platform Verification
-    needs: [test, integration-tests]
-    strategy:
-      matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - x86_64-pc-windows-msvc
-          - x86_64-apple-darwin
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-          - target: x86_64-apple-darwin
-            os: macos-latest
-    
-    runs-on: ${{ matrix.os }}
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.0
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: verify-${{ matrix.target }}
-
-      - name: Check library builds for target
-        run: cargo check --target ${{ matrix.target }} --all-features
-
-      - name: Run tests for target (if native)
-        if: matrix.target == 'x86_64-unknown-linux-gnu' || matrix.target == 'x86_64-pc-windows-msvc' || matrix.target == 'x86_64-apple-darwin'
-        run: cargo test --target ${{ matrix.target }} --all-features
-
-  # Final status check
-  ci-success:
-    name: CI Success
-    needs: 
-      - quick-checks
-      - test
-      - feature-tests
-      - integration-tests
-      - coverage
-      - cross-platform-verify
-    runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-      - name: Check all jobs success
-        run: |
-          if [[ "${{ needs.quick-checks.result }}" != "success" ]]; then
-            echo "Quick checks failed"
-            exit 1
-          fi
-          if [[ "${{ needs.test.result }}" != "success" ]]; then
-            echo "Tests failed"
-            exit 1
-          fi
-          if [[ "${{ needs.feature-tests.result }}" != "success" ]]; then
-            echo "Feature tests failed"
-            exit 1
-          fi
-          if [[ "${{ needs.integration-tests.result }}" != "success" ]]; then
-            echo "Integration tests failed"
-            exit 1
-          fi
-          if [[ "${{ needs.cross-platform-verify.result }}" != "success" ]]; then
-            echo "Cross-platform verification failed"
-            exit 1
-          fi
-          echo "All CI jobs passed successfully!"
+          name: coverage-lcov
+          path: lcov.info
+          if-no-files-found: error
+          retention-days: 14
