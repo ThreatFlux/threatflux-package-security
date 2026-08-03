@@ -43,10 +43,19 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ env.RUST_STABLE }}-${{ hashFiles('Cargo.lock') }}
 
       - name: Install workflow linter
-        # This pinned installer commit also pins tool versions and checksums.
-        uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
-        with:
-          tool: actionlint@1.7.12
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        shell: bash
+        run: |
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          destination="${RUNNER_TEMP}/${archive}"
+          curl --fail --silent --show-error --location --retry 3 \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}" \
+            --output "$destination"
+          echo "${ACTIONLINT_SHA256}  ${destination}" | sha256sum --check --strict
+          tar -xzf "$destination" -C "$RUNNER_TEMP" actionlint
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
       - name: Lint GitHub Actions workflows
         run: actionlint
