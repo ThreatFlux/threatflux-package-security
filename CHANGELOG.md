@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Changed
+
+- Refreshed every dependency requirement to the latest stable release,
+  including `tokio` 1.53.1, `regex` 1.13.1, `toml` 1.1.4, and `chrono` 0.4.45.
+  No API change.
+
+### Fixed
+
+- The README told readers the crate was unpublished and to pin a git commit;
+  0.2.0 has been on crates.io since 2026-08-03, so it now shows the real
+  install snippet and carries crate and documentation badges.
+- `release.yml` can be dispatched at a tag and `auto-release.yml` dispatches it,
+  so an automated tag still publishes. GitHub does not start workflows for
+  pushes authored by `GITHUB_TOKEN`, which left tag-triggered publishing dead.
+
 ## [0.2.0] - 2026-08-03
 
 ### Added

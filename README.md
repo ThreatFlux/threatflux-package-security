@@ -1,5 +1,7 @@
 # ThreatFlux Package Security
 
+[![Crates.io](https://img.shields.io/crates/v/threatflux-package-security.svg)](https://crates.io/crates/threatflux-package-security)
+[![docs.rs](https://docs.rs/threatflux-package-security/badge.svg)](https://docs.rs/threatflux-package-security)
 [![CI](https://github.com/ThreatFlux/threatflux-package-security/actions/workflows/ci.yml/badge.svg)](https://github.com/ThreatFlux/threatflux-package-security/actions/workflows/ci.yml)
 [![Security](https://github.com/ThreatFlux/threatflux-package-security/actions/workflows/security.yml/badge.svg)](https://github.com/ThreatFlux/threatflux-package-security/actions/workflows/security.yml)
 [![MSRV](https://img.shields.io/badge/MSRV-1.95-blue.svg)](https://www.rust-lang.org)
@@ -33,15 +35,11 @@ See [Behavior and guarantees](docs/BEHAVIOR.md) for the precise contract.
 
 ## Install
 
-The crate has not yet been published to crates.io. Until the first release, pin a reviewed full commit SHA:
-
 ```toml
 [dependencies]
-threatflux-package-security = { git = "https://github.com/ThreatFlux/threatflux-package-security", rev = "<full-commit-sha>" }
+threatflux-package-security = "0.2.0"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
-
-After 0.2.0 is published, applications can use `threatflux-package-security = "0.2"` from crates.io.
 
 The minimum supported Rust version is 1.95. Applications should commit their `Cargo.lock` and use `--locked` in CI.
 
