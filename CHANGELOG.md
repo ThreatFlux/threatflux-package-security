@@ -10,6 +10,14 @@ All notable changes to this project are documented in this file. The format foll
   rehearses a release without tagging, releasing, or publishing; see
   [docs/RELEASING.md](docs/RELEASING.md#rehearse-a-release).
 
+### Changed
+
+- `auto-release.yml` cuts releases with the ThreatFlux automation GitHub App
+  through the shared reusable workflow v0.7.7. The App's tag push starts
+  `release.yml` through its tag trigger, and the reusable workflow skips its
+  explicit dispatch on that path, so `release.yml` runs once per release; see
+  [docs/RELEASING.md](docs/RELEASING.md#automated-releases).
+
 ### Security
 
 - `release.yml` publishes to crates.io only through trusted publishing. It no
