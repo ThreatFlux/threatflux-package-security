@@ -10,6 +10,8 @@ All notable changes to this project are documented in this file. The format foll
   rehearses a release without tagging, releasing, or publishing; see
   [docs/RELEASING.md](docs/RELEASING.md#rehearse-a-release).
 
+## [0.2.1] - 2026-08-11
+
 ### Changed
 
 - Refreshed every dependency requirement to the latest stable release,
@@ -81,4 +83,7 @@ All notable changes to this project are documented in this file. The format foll
 - Initial npm, Python, and Java analysis APIs.
 - Bundled vulnerability records, pattern matching, risk scoring, and typosquatting heuristics.
 
+[Unreleased]: https://github.com/ThreatFlux/threatflux-package-security/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/ThreatFlux/threatflux-package-security/releases/tag/v0.2.1
+[0.2.0]: https://github.com/ThreatFlux/threatflux-package-security/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ThreatFlux/threatflux-package-security/releases/tag/v0.1.0
