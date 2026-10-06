@@ -65,7 +65,10 @@ gh workflow run auto-release.yml -f dry_run=true
 gh workflow run release.yml -f dry_run=true -f version=0.2.2
 ```
 
-The auto-release dry run reports the version the next release would take. The `release.yml` dry run
+The auto-release dry run logs the version and tag the next release would take and the files its
+version-bump commit would rewrite. It analyzes only after CI and Security have passed on the
+dispatched commit; otherwise the release job is skipped. Like a real run, it fails if the
+`Cargo.toml` version is lower than the latest release tag. The `release.yml` dry run
 builds the dispatch ref (add `--ref <branch>` to rehearse another branch), needs no tag, and stages
 the same `Cargo.toml`/`Cargo.lock` version bump the automated release commit makes in a local,
 unpushed commit. It then runs the full test matrix and the publish-job gates that apply before a tag
