@@ -55,6 +55,25 @@ Only repository owners and crates.io owners should perform the bootstrap. Comple
 
 Never pass the token on a command line, store it in shell history, commit it, or add it as a long-lived repository secret. If the local rebuild does not match the canonical crates.io archive, stop and investigate; do not attach a different artifact under the same version.
 
+## Rehearse a release
+
+Both release workflows accept a `dry_run` dispatch input that never tags, releases, publishes, or
+uploads anything:
+
+```bash
+gh workflow run auto-release.yml -f dry_run=true
+gh workflow run release.yml -f dry_run=true -f version=0.2.2
+```
+
+The auto-release dry run reports the version the next release would take. The `release.yml` dry run
+builds the dispatch ref (add `--ref <branch>` to rehearse another branch), needs no tag, and stages
+the same `Cargo.toml`/`Cargo.lock` version bump the automated release commit makes in a local,
+unpushed commit. It then runs the full test matrix and the publish-job gates that apply before a tag
+exists, through `cargo package` and `cargo publish --dry-run --locked`. It skips the
+`Verify annotated tag is on main` and `Recheck immutable release tag` checks, the `crates-io`
+environment, crates.io authentication and upload, the artifact upload, and the GitHub release. It
+fails if the version is already on crates.io. A dispatch without `dry_run` rejects `version`.
+
 ## Tag and publish subsequent releases
 
 Create an annotated tag whose name exactly matches the package version:
