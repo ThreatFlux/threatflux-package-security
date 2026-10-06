@@ -10,6 +10,13 @@ All notable changes to this project are documented in this file. The format foll
   rehearses a release without tagging, releasing, or publishing; see
   [docs/RELEASING.md](docs/RELEASING.md#rehearse-a-release).
 
+### Security
+
+- `release.yml` publishes to crates.io only through trusted publishing. It no
+  longer falls back to an organization registry-token secret when the OIDC
+  exchange fails, and a failed exchange now fails the release instead of being
+  ignored.
+
 ## [0.2.1] - 2026-08-11
 
 ### Changed
