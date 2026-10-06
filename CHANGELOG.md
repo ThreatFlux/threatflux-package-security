@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- `release.yml` replaces a GitHub release body that is only its
+  `## Release <tag>` heading with GitHub's generated notes for the changes
+  since the previous release. The shared release action lists only breaking,
+  feature, and fix commits, so v0.2.2, cut from `ci:` and `docs:` commits, was
+  published with a heading-only body and its notes had to be written by hand.
+
+## [0.2.2] - 2026-10-06
+
 ### Added
 
 - `release.yml` and `auto-release.yml` accept a `dry_run` dispatch input that
@@ -98,7 +108,8 @@ All notable changes to this project are documented in this file. The format foll
 - Initial npm, Python, and Java analysis APIs.
 - Bundled vulnerability records, pattern matching, risk scoring, and typosquatting heuristics.
 
-[Unreleased]: https://github.com/ThreatFlux/threatflux-package-security/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/ThreatFlux/threatflux-package-security/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/ThreatFlux/threatflux-package-security/releases/tag/v0.2.2
 [0.2.1]: https://github.com/ThreatFlux/threatflux-package-security/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ThreatFlux/threatflux-package-security/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ThreatFlux/threatflux-package-security/releases/tag/v0.1.0

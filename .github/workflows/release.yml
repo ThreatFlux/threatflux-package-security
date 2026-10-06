@@ -458,6 +458,21 @@ jobs:
               dist/*.crate.sha256 \
               dist/package-contents.txt \
               --clobber
+
+            # The shared release action lists only breaking, feat, and fix
+            # commits, so a release cut from ci, docs, or chore commits gets a
+            # body that is only its "## Release <tag>" heading. Keep notes
+            # that say something; replace that placeholder with GitHub's
+            # generated notes for the changes since the previous release.
+            body="$(gh release view "$TAG_NAME" --json body --jq .body | tr -d '\r' | sed '/^[[:space:]]*$/d')"
+            if [[ "$body" == "## Release ${TAG_NAME}" ]]; then
+              notes="${RUNNER_TEMP}/release-notes.md"
+              printf '## Release %s\n\n' "$TAG_NAME" > "$notes"
+              gh api --method POST "repos/${GH_REPO}/releases/generate-notes" \
+                -f tag_name="$TAG_NAME" --jq .body >> "$notes"
+              gh release edit "$TAG_NAME" --notes-file "$notes"
+              echo "Replaced the heading-only release notes with generated notes"
+            fi
           else
             options=(--generate-notes --title "ThreatFlux Package Security ${TAG_NAME}" --verify-tag)
             if [[ "$prerelease" == "true" ]]; then
