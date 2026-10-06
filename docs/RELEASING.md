@@ -66,11 +66,13 @@ gh workflow run release.yml -f dry_run=true -f version=0.2.2
 ```
 
 The auto-release dry run reports the version the next release would take. The `release.yml` dry run
-runs on any ref (optionally `-f source_ref=<ref>`), needs no tag, and stages the same
-`Cargo.toml`/`Cargo.lock` version bump the automated release commit makes in a local, unpushed commit.
-It then runs the full test matrix and every publish-job gate through `cargo package` and
-`cargo publish --dry-run --locked`. It skips the `crates-io` environment and fails if the version is
-already on crates.io. `version` and `source_ref` are rejected without `dry_run`.
+builds the dispatch ref (add `--ref <branch>` to rehearse another branch), needs no tag, and stages
+the same `Cargo.toml`/`Cargo.lock` version bump the automated release commit makes in a local,
+unpushed commit. It then runs the full test matrix and the publish-job gates that apply before a tag
+exists, through `cargo package` and `cargo publish --dry-run --locked`. It skips the
+`Verify annotated tag is on main` and `Recheck immutable release tag` checks, the `crates-io`
+environment, crates.io authentication and upload, the artifact upload, and the GitHub release. It
+fails if the version is already on crates.io. A dispatch without `dry_run` rejects `version`.
 
 ## Tag and publish subsequent releases
 
