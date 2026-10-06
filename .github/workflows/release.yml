@@ -4,18 +4,38 @@ on:
   push:
     tags:
       - "v*.*.*"
+  # A real dispatch (auto-release passes no inputs) must run on the release
+  # tag. With dry_run, any ref works and nothing is tagged, released, or
+  # published.
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Rehearse the release (gates, package, publish --dry-run) without tagging, releasing, or publishing
+        required: false
+        type: boolean
+        default: false
+      version:
+        description: "Dry run only: version to rehearse, e.g. 0.2.2 (defaults to the Cargo.toml version)"
+        required: false
+        type: string
+      source_ref:
+        description: "Dry run only: git ref to build (defaults to the dispatch ref)"
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: release
+  # Dry runs must never queue behind, or hold up, a real release.
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'release-dry-run' || 'release' }}
   cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # Only workflow_dispatch can set this; tag pushes always perform a real release.
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
 
 jobs:
   provenance:
@@ -28,37 +48,62 @@ jobs:
       published: ${{ steps.registry.outputs.published }}
       published_checksum: ${{ steps.registry.outputs.published_checksum }}
       tag_object: ${{ steps.provenance.outputs.tag_object }}
+      # Empty for real releases, so later jobs check out the tag ref itself.
+      source_sha: ${{ steps.version.outputs.source_sha }}
     steps:
       - name: Check out tagged source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
+          ref: ${{ env.DRY_RUN == 'true' && inputs.source_ref || '' }}
 
       - name: Install Rust
         run: rustup toolchain install 1.97.1 --profile minimal
 
       - name: Verify semantic version
         id: version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          SOURCE_REF: ${{ inputs.source_ref }}
         shell: bash
         run: |
-          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "Release tag $GITHUB_REF_NAME is not a semantic version" >&2
-            exit 1
-          fi
-
           metadata="$(cargo metadata --locked --no-deps --format-version 1)"
           package_name="$(jq -er '.packages[] | select(.name == "threatflux-package-security") | .name' <<< "$metadata")"
-          package_version="$(jq -er '.packages[] | select(.name == "threatflux-package-security") | .version' <<< "$metadata")"
-          if [[ "$GITHUB_REF_NAME" != "v${package_version}" ]]; then
-            echo "Tag $GITHUB_REF_NAME does not match ${package_name} ${package_version}" >&2
+          manifest_version="$(jq -er '.packages[] | select(.name == "threatflux-package-security") | .version' <<< "$metadata")"
+
+          source_sha=""
+          if [[ "$DRY_RUN" == "true" ]]; then
+            # Auto-release bumps the manifest in the release commit it tags; the
+            # publish job stages that same bump locally for the requested version.
+            release_tag="v${REQUESTED_VERSION:-$manifest_version}"
+            source_sha="$(git rev-parse HEAD)"
+            echo "Dry run: rehearsing ${release_tag} from ${source_sha} without creating or checking the tag"
+          else
+            if [[ -n "$REQUESTED_VERSION" || -n "$SOURCE_REF" ]]; then
+              echo "version and source_ref only apply to dry runs; dispatch a real release on its tag" >&2
+              exit 1
+            fi
+            release_tag="$GITHUB_REF_NAME"
+          fi
+
+          if [[ ! "$release_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tag $release_tag is not a semantic version" >&2
+            exit 1
+          fi
+          if [[ "$DRY_RUN" != "true" && "$release_tag" != "v${manifest_version}" ]]; then
+            echo "Tag $release_tag does not match ${package_name} ${manifest_version}" >&2
             exit 1
           fi
 
-          echo "package_name=$package_name" >> "$GITHUB_OUTPUT"
-          echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
+          {
+            echo "package_name=$package_name"
+            echo "package_version=${release_tag#v}"
+            echo "source_sha=$source_sha"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Verify annotated tag is on main
+        if: env.DRY_RUN != 'true'
         id: provenance
         shell: bash
         run: |
@@ -115,6 +160,10 @@ jobs:
           checksum="$(jq -er --arg version "$PACKAGE_VERSION" \
             '.versions[] | select(.num == $version) | .checksum' "$response" 2>/dev/null || true)"
           if [[ -n "$checksum" ]]; then
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "${PACKAGE_NAME} ${PACKAGE_VERSION} is already on crates.io; rehearse an unpublished version" >&2
+              exit 1
+            fi
             echo "published=true" >> "$GITHUB_OUTPUT"
             echo "published_checksum=$checksum" >> "$GITHUB_OUTPUT"
           else
@@ -136,6 +185,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ needs.provenance.outputs.source_sha }}
 
       - name: Install Rust
         run: rustup toolchain install 1.97.1 --profile minimal
@@ -148,8 +198,10 @@ jobs:
     needs: [provenance, verify]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Dry runs skip the tag-only crates-io environment: an empty name runs the
+    # job without an environment, so no deployment is recorded.
     environment:
-      name: crates-io
+      name: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) && 'crates-io' || '' }}
       url: https://crates.io/crates/threatflux-package-security
     permissions:
       contents: read
@@ -160,9 +212,53 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          ref: ${{ needs.provenance.outputs.source_sha }}
 
       - name: Install Rust
         run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+
+      - name: Stage the release version (dry run)
+        if: env.DRY_RUN == 'true'
+        env:
+          PACKAGE_NAME: ${{ needs.provenance.outputs.package_name }}
+          PACKAGE_VERSION: ${{ needs.provenance.outputs.package_version }}
+        shell: bash
+        run: |
+          manifest_version() {
+            cargo metadata --locked --no-deps --format-version 1 |
+              jq -er --arg name "$PACKAGE_NAME" '.packages[] | select(.name == $name) | .version'
+          }
+          if [[ "$(manifest_version)" == "$PACKAGE_VERSION" ]]; then
+            echo "${PACKAGE_NAME} is already at ${PACKAGE_VERSION}"
+            exit 0
+          fi
+
+          # Mirror the release commit auto-release tags: bump the [package]
+          # version and its lockfile entry, nothing else.
+          awk -v version="$PACKAGE_VERSION" '
+            /^\[/ { in_package = ($0 == "[package]") }
+            in_package && !done && /^version = "/ { print "version = \"" version "\""; done = 1; next }
+            { print }
+          ' Cargo.toml > "${RUNNER_TEMP}/Cargo.toml"
+          mv "${RUNNER_TEMP}/Cargo.toml" Cargo.toml
+          cargo update --workspace
+
+          changed="$(git diff --name-only | sort | tr '\n' ' ')"
+          if [[ "$changed" != "Cargo.lock Cargo.toml " ]]; then
+            echo "Version staging changed unexpected files: ${changed}" >&2
+            exit 1
+          fi
+          if [[ "$(manifest_version)" != "$PACKAGE_VERSION" ]]; then
+            echo "Could not stage ${PACKAGE_NAME} ${PACKAGE_VERSION}" >&2
+            exit 1
+          fi
+
+          # Local-only commit (credentials are not persisted) so packaging sees
+          # a clean tree, exactly as it does on the tagged release commit.
+          git -c user.name="ThreatFlux release dry run" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet --all --message "chore: release v${PACKAGE_VERSION} (dry run)"
+          git show --stat --format='%h %s' HEAD
 
       - name: Check formatting and lints
         run: |
@@ -221,6 +317,7 @@ jobs:
           fi
 
       - name: Recheck immutable release tag
+        if: env.DRY_RUN != 'true'
         env:
           EXPECTED_TAG_OBJECT: ${{ needs.provenance.outputs.tag_object }}
         shell: bash
@@ -233,13 +330,13 @@ jobs:
           fi
 
       - name: Authenticate with crates.io
-        if: needs.provenance.outputs.published == 'false'
+        if: env.DRY_RUN != 'true' && needs.provenance.outputs.published == 'false'
         id: crates-io
         continue-on-error: true
         uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
 
       - name: Publish crate
-        if: needs.provenance.outputs.published == 'false'
+        if: env.DRY_RUN != 'true' && needs.provenance.outputs.published == 'false'
         env:
           OIDC_REGISTRY_TOKEN: ${{ steps.crates-io.outputs.token }}
           BOOTSTRAP_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -258,6 +355,7 @@ jobs:
             cargo publish --locked --package "$PACKAGE_NAME"
 
       - name: Download and verify the published crate
+        if: env.DRY_RUN != 'true'
         env:
           PACKAGE_NAME: ${{ needs.provenance.outputs.package_name }}
           PACKAGE_VERSION: ${{ needs.provenance.outputs.package_version }}
@@ -292,6 +390,7 @@ jobs:
             > "${PACKAGE_NAME}-${PACKAGE_VERSION}.crate.sha256"
 
       - name: Upload published package
+        if: env.DRY_RUN != 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: crate-package
@@ -299,9 +398,18 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Report dry-run package
+        if: env.DRY_RUN == 'true'
+        shell: bash
+        run: |
+          echo "Dry run complete: ${LOCAL_PACKAGE} sha256 ${LOCAL_CHECKSUM}"
+          echo "Package files: $(wc -l < target/package-contents.txt)"
+          echo "Nothing was tagged, released, published, or uploaded."
+
   github-release:
     name: Create GitHub release
     needs: [provenance, publish]
+    if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

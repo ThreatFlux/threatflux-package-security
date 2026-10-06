@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+
+- `release.yml` and `auto-release.yml` accept a `dry_run` dispatch input that
+  rehearses a release without tagging, releasing, or publishing; see
+  [docs/RELEASING.md](docs/RELEASING.md#rehearse-a-release).
+
 ### Changed
 
 - Refreshed every dependency requirement to the latest stable release,

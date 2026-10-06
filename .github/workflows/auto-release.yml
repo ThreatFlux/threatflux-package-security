@@ -1,7 +1,8 @@
 name: Auto Release
 
 concurrency:
-  group: auto-release-${{ github.event.workflow_run.head_branch || github.ref_name || 'main' }}
+  # A dry-run dispatch must never cancel a real release in progress.
+  group: auto-release-${{ github.event.workflow_run.head_branch || github.ref_name || 'main' }}${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '-dry-run' || '' }}
   cancel-in-progress: true
 
 on:
@@ -21,6 +22,11 @@ on:
           - patch
           - minor
           - major
+      dry_run:
+        description: Analyze and report the next release without committing, tagging, releasing, or dispatching release.yml
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -36,6 +42,7 @@ jobs:
     uses: ThreatFlux/github_actions/.github/workflows/reusable-auto-release.yml@7a5f08885a77520db023882c8de17d9e6580b7ae # v0.7.5
     with:
       bump: ${{ github.event.inputs.version_bump || 'auto' }}
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
       required-workflows: CI,Security
       dispatch-workflows: release.yml
 
