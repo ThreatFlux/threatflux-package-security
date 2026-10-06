@@ -103,4 +103,4 @@ Public rustdoc should describe errors, resource behavior, and security semantics
 
 ## Release changes
 
-Do not publish routine releases from a workstation. They use the tagged workflow and crates.io trusted publishing described in [docs/RELEASING.md](docs/RELEASING.md). The only exception is the separately controlled, one-time first-publication bootstrap documented there.
+Do not publish releases from a workstation. They use the tagged workflow and crates.io trusted publishing described in [docs/RELEASING.md](docs/RELEASING.md).

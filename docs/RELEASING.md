@@ -1,21 +1,22 @@
 # Release Process
 
-After the crate exists on crates.io, releases are produced by GitHub Actions from an immutable version tag. The initial publication has a separately controlled bootstrap because crates.io trusted publishing cannot create a new crate.
+Releases are produced by GitHub Actions from an immutable version tag and published to crates.io with trusted publishing. No long-lived registry token is involved.
 
 ## One-time repository setup
 
 Repository administrators must configure:
 
-1. a protected `crates-io` environment for the publish job;
-2. after the bootstrap release, a crates.io trusted publisher bound to this repository and release workflow;
+1. a protected `crates-io` environment, limited to `v*` tags, for the publish job;
+2. a crates.io trusted publisher bound to this repository, the `release.yml` workflow, and the `crates-io` environment;
 3. protected `main` and `v*` tags with required CI and security checks;
 4. least-privilege default Actions permissions and no workflow approval of pull requests;
 5. GitHub Pages with “GitHub Actions” as its source if documentation deployment is enabled.
 
-Routine releases use crates.io OIDC. The first publication may fall back to the organization-managed
-`CARGO_REGISTRY_TOKEN` secret because crates.io cannot issue an OIDC token for a crate that does not
-exist yet. Do not copy that credential into the repository or expose it in workflow output; configure
-the trusted publisher after bootstrap and remove the fallback when the release train is complete.
+Every publication uses crates.io trusted publishing. Only a real release runs the publish job in the
+`crates-io` environment; there, `rust-lang/crates-io-auth-action` exchanges the job's GitHub OIDC
+identity for a short-lived token, and the action revokes that token when the job ends. The workflow
+reads no registry secret and has no token fallback, so a failed exchange fails the release. Do not
+add a crates.io API token as a repository, environment, or organization secret for this workflow.
 
 ## Prepare the release
 
@@ -36,24 +37,11 @@ cargo package --locked
 cargo publish --dry-run --locked
 ```
 
-The version must not already exist on crates.io when a routine release begins. The tagged workflow may observe an existing version during the first-release bootstrap or when a prior run published successfully but failed later. In either case, it must verify the locally rebuilt package against the canonical crates.io checksum before continuing.
+The version must not already exist on crates.io when a routine release begins. The tagged workflow may observe an existing version when a prior run published successfully but failed later. It must then verify the locally rebuilt package against the canonical crates.io checksum before continuing.
 
-## Bootstrap the first crates.io release
+## Publishing credentials
 
-Only repository owners and crates.io owners should perform the bootstrap. Complete review and every preparation check on the exact `main` commit first.
-
-1. Provide a crates.io token scoped to publishing a new crate through the organization-managed
-   `CARGO_REGISTRY_TOKEN` Actions secret.
-2. From a clean checkout of the reviewed `main` release commit, rebuild and inspect the package.
-3. Create and push the matching immutable annotated tag on that same commit.
-4. Let the release workflow prefer OIDC and fall back to the bootstrap secret for the first publication.
-5. Verify the canonical crates.io archive checksum and confirm the published version.
-6. Confirm that the GitHub release contains the canonical archive, checksum, and package-content list.
-7. Configure the crates.io trusted publisher for subsequent releases.
-8. Revoke the bootstrap token or remove its release-workflow access after every crate in the
-   coordinated bootstrap train has migrated to trusted publishing.
-
-Never pass the token on a command line, store it in shell history, commit it, or add it as a long-lived repository secret. If the local rebuild does not match the canonical crates.io archive, stop and investigate; do not attach a different artifact under the same version.
+Versions 0.2.0 and 0.2.1 were published with a registry token. That fallback has been removed now that the crate exists on crates.io and its trusted publisher is configured. Never pass a crates.io token on a command line, store it in shell history, commit it, or add it as a long-lived secret. If the local rebuild does not match the canonical crates.io archive, stop and investigate; do not attach a different artifact under the same version.
 
 ## Rehearse a release
 
@@ -93,7 +81,7 @@ The release workflow must independently verify:
 - the tag is a valid `vMAJOR.MINOR.PATCH` release tag;
 - the tagged commit is on `main`;
 - the tag and `Cargo.toml` versions agree;
-- the crates.io state is valid: unpublished for a new release, or an exact package-checksum match for a bootstrap/recovery rerun;
+- the crates.io state is valid: unpublished for a new release, or an exact package-checksum match for a recovery rerun;
 - formatting, linting, tests, docs, security policy, and package dry-run pass;
 - the published artifact is the same generated `.crate` archive that was verified;
 - the GitHub release contains the canonical `.crate`, its checksum, and the package-content list;
