@@ -177,11 +177,13 @@ impl JavaAnalyzer {
 
         for i in 0..archive.len() {
             let file = archive.by_index(i)?;
-            let name = file.name();
+            let name = file
+                .name()
+                .context("Java archive contains an invalid entry name")?;
             if name.len() > crate::limits::MAX_ARCHIVE_ENTRY_NAME_BYTES {
                 bail!("Java archive contains an overlong entry name");
             }
-            if is_unsafe_archive_entry_name(name) || file.enclosed_name().is_none() {
+            if is_unsafe_archive_entry_name(name.as_ref()) || file.enclosed_name().is_none() {
                 bail!("Java archive contains an unsafe entry path");
             }
             if file.is_symlink() {

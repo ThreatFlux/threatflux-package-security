@@ -22,22 +22,22 @@ cargo test --test analysis_boundaries --locked
 Run before requesting review:
 
 ```bash
-cargo +1.97.1 fmt --all -- --check
-cargo +1.97.1 check --all-targets --all-features --locked
-cargo +1.97.1 clippy --all-targets --all-features --locked -- -D warnings
-cargo +1.97.1 test --all-targets --all-features --locked
-cargo +1.97.1 test --doc --all-features --locked
-RUSTDOCFLAGS="-D warnings" cargo +1.97.1 doc --all-features --no-deps --locked
+cargo +1.99.1 fmt --all -- --check
+cargo +1.99.1 check --all-targets --all-features --locked
+cargo +1.99.1 clippy --all-targets --all-features --locked -- -D warnings
+cargo +1.99.1 test --all-targets --all-features --locked
+cargo +1.99.1 test --doc --all-features --locked
+RUSTDOCFLAGS="-D warnings" cargo +1.99.1 doc --all-features --no-deps --locked
 make markdown
 cargo +1.95.0 check --all-targets --all-features --locked
 cargo +1.95.0 test --all-targets --all-features --locked
 cargo audit --deny warnings
 cargo deny check
-cargo +1.97.1 package --allow-dirty --locked
-cargo +1.97.1 publish --dry-run --allow-dirty --locked
+cargo +1.99.1 package --allow-dirty --locked
+cargo +1.99.1 publish --dry-run --allow-dirty --locked
 ```
 
-The explicit `+1.95.0` commands bypass the directory’s pinned stable override. A plain `cargo` command in this repository uses Rust 1.97.1 and does not validate the MSRV.
+The explicit `+1.95.0` commands bypass the directory’s pinned stable override. A plain `cargo` command in this repository uses Rust 1.99.1 and does not validate the MSRV.
 
 ## Required coverage by change type
 
