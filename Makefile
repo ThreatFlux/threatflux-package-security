@@ -29,16 +29,7 @@ test-doc: ## Run crate documentation tests
 	cargo test --doc --all-features --locked
 
 markdown: ## Compile Rust blocks in README and guides
-	CARGO_TARGET_DIR=$(MARKDOWN_TARGET_DIR) cargo +$(STABLE) build --all-features --examples --locked
-	@set -eu; \
-	rlib=$$(ls -t $(MARKDOWN_TARGET_DIR)/debug/deps/libthreatflux_package_security-*.rlib | head -n 1); \
-	tokio_rlib=$$(ls -t $(MARKDOWN_TARGET_DIR)/debug/deps/libtokio-*.rlib | head -n 1); \
-	for document in README.md $$(find docs -type f -name '*.md' -print 2>/dev/null | sort); do \
-		rustup run $(STABLE) rustdoc --test "$$document" --edition 2024 \
-			--extern threatflux_package_security="$$rlib" \
-			--extern tokio="$$tokio_rlib" \
-			-L dependency=$(MARKDOWN_TARGET_DIR)/debug/deps; \
-	done
+	python3 scripts/check_markdown.py --package threatflux-package-security --toolchain $(STABLE) --target-dir $(MARKDOWN_TARGET_DIR) --examples --recursive --extern tokio
 
 msrv-check: ## Check and test with the minimum Rust version
 	cargo +$(MSRV) check --all-targets --all-features --locked
