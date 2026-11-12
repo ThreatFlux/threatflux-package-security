@@ -36,7 +36,9 @@ highlight = "all"
 workspace-default-features = "allow"
 external-default-features = "allow"
 deny = []
-skip = []
+skip = [
+    { name = "syn", version = "2.0.119", reason = "latest zeroize_derive 1.5 requires syn 2 while serde/thiserror require syn 3; remove when stable upstream graphs converge" },
+]
 skip-tree = []
 
 [sources]
