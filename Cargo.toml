@@ -41,8 +41,8 @@ regex = "1.13.1"
 pep440_rs = { version = "0.7.3", default-features = false }
 strsim = "0.11.1"
 async-trait = "0.1.92"
-zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2-zlib-rs"] }
-toml = "1.1.8"
+zip = { version = "9.5.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+toml = "1.2.1+spec-1.1.0"
 
 [dev-dependencies]
 tempfile = "3.27.0"
