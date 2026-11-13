@@ -17,7 +17,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  RUST_STABLE: 1.99.1
+  RUST_STABLE: 1.100.0
 
 jobs:
   quality:
@@ -31,7 +31,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Rust
-        run: rustup toolchain install 1.99.1 --profile minimal --component clippy --component rustfmt
+        run: rustup toolchain install 1.100.0 --profile minimal --component clippy --component rustfmt
 
       - name: Cache Cargo data
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -108,7 +108,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Rust
-        run: rustup toolchain install 1.99.1 --profile minimal
+        run: rustup toolchain install 1.100.0 --profile minimal
 
       - name: Test without default features
         run: cargo test --all-targets --no-default-features --locked
@@ -128,7 +128,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Rust
-        run: rustup toolchain install 1.99.1 --profile minimal
+        run: rustup toolchain install 1.100.0 --profile minimal
 
       - name: Cache Cargo data
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -154,11 +154,11 @@ jobs:
           persist-credentials: false
 
       - name: Install Rust
-        run: rustup toolchain install 1.99.1 --profile minimal --component llvm-tools-preview
+        run: rustup toolchain install 1.100.0 --profile minimal --component llvm-tools-preview
 
       - name: Install cargo-llvm-cov
         # This pinned installer commit also pins tool versions and checksums.
-        uses: taiki-e/install-action@682ce6c3c696a4cd5168a05f98e51aa02b877941 # v2.89.1
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-llvm-cov@0.9.1
 

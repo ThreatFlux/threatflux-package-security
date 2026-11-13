@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 
 MSRV := 1.95.0
-STABLE := 1.99.1
+STABLE := 1.100.0
 MARKDOWN_TARGET_DIR := target/markdown-doctests
 
 .PHONY: help fmt fmt-check check lint test test-doc markdown msrv-check docs examples
@@ -29,15 +29,15 @@ test-doc: ## Run crate documentation tests
 	cargo test --doc --all-features --locked
 
 markdown: ## Compile Rust blocks in README and guides
-	CARGO_TARGET_DIR=$(MARKDOWN_TARGET_DIR) cargo +$(STABLE) build --all-features --examples --locked
+	@mkdir -p "$(MARKDOWN_TARGET_DIR)"
+	CARGO_TARGET_DIR="$(MARKDOWN_TARGET_DIR)" cargo +$(STABLE) metadata --all-features --locked --format-version=1 > "$(MARKDOWN_TARGET_DIR)/metadata.json"
+	CARGO_TARGET_DIR="$(MARKDOWN_TARGET_DIR)" cargo +$(STABLE) build --all-features --examples --locked --message-format=json > "$(MARKDOWN_TARGET_DIR)/artifacts.json" || { cat "$(MARKDOWN_TARGET_DIR)/artifacts.json" >&2; exit 1; }
 	@set -eu; \
-	rlib=$$(ls -t $(MARKDOWN_TARGET_DIR)/debug/deps/libthreatflux_package_security-*.rlib | head -n 1); \
-	tokio_rlib=$$(ls -t $(MARKDOWN_TARGET_DIR)/debug/deps/libtokio-*.rlib | head -n 1); \
 	for document in README.md $$(find docs -type f -name '*.md' -print 2>/dev/null | sort); do \
-		rustup run $(STABLE) rustdoc --test "$$document" --edition 2024 \
-			--extern threatflux_package_security="$$rlib" \
-			--extern tokio="$$tokio_rlib" \
-			-L dependency=$(MARKDOWN_TARGET_DIR)/debug/deps; \
+		python3 scripts/check_markdown.py --package threatflux-package-security --metadata "$(MARKDOWN_TARGET_DIR)/metadata.json" \
+			--artifacts "$(MARKDOWN_TARGET_DIR)/artifacts.json" --document "$$document" --extern tokio > "$(MARKDOWN_TARGET_DIR)/arguments.bin"; \
+		test -s "$(MARKDOWN_TARGET_DIR)/arguments.bin"; \
+		xargs -0 rustup run "$(STABLE)" rustdoc < "$(MARKDOWN_TARGET_DIR)/arguments.bin"; \
 	done
 
 msrv-check: ## Check and test with the minimum Rust version
