@@ -45,14 +45,19 @@ Versions 0.2.0 and 0.2.1 were published with a registry token. That fallback has
 
 ## Automated releases
 
-`auto-release.yml` runs the shared ThreatFlux reusable release workflow after CI and Security pass
-on `main`. It cuts the release with an installation token from the ThreatFlux automation GitHub
-App (organization variable `TF_AUTOMATION_APP_ID` and secret `TF_AUTOMATION_APP_PRIVATE_KEY`). The
-token is scoped to this repository with `contents: write`. A tag the App pushes is an ordinary
-push, so it starts `release.yml` through its `push: tags` trigger and the reusable workflow
-dispatches nothing. Only when no App is configured and the release falls back to `GITHUB_TOKEN`,
-whose tag push starts no workflow, does it dispatch `release.yml` on the new tag. Either way
-`release.yml` runs once per release.
+After CI and Security pass on the current `main` commit, `auto-release.yml` uses
+the shared ThreatFlux reusable workflow to open or update a version-bump pull
+request from `automation/release`. The proposal follows the same code-owner
+review and merge rules as other changes. After it merges, CI and Security
+must pass on the new `main` commit before automation tags that reviewed version.
+
+The workflow uses an installation token from the ThreatFlux automation
+GitHub App (organization variable `TF_AUTOMATION_APP_ID` and secret
+`TF_AUTOMATION_APP_PRIVATE_KEY`) with repository-scoped contents and
+pull request write permissions. The App's tag push starts `release.yml`
+through its tag trigger. The reusable workflow explicitly dispatches
+`release.yml` only on the `GITHUB_TOKEN` fallback path, where a tag push
+cannot start another workflow.
 
 For the advisory timestamp migration, automatic release from package version
 0.2.6 selects the pre-1.0 compatibility bump to 0.3.0. Subsequent versions use the
@@ -79,8 +84,8 @@ version-bump commit would rewrite. It analyzes only after CI and Security have p
 dispatched commit; otherwise the release job is skipped. Like a real run, it fails if the
 `Cargo.toml` version is lower than the latest release tag. The `release.yml` dry run
 builds the dispatch ref (add `--ref <branch>` to rehearse another branch), needs no tag, and stages
-the same `Cargo.toml`/`Cargo.lock` version bump the automated release commit makes in a local,
-unpushed commit. It then runs the full test matrix and the publish-job gates that apply before a tag
+the same `Cargo.toml`/`Cargo.lock` version bump as the release proposal in a
+local, unpushed commit. It then runs the full test matrix and the publish-job gates that apply before a tag
 exists, through `cargo package` and `cargo publish --dry-run --locked`. It skips the
 `Verify annotated tag is on main` and `Recheck immutable release tag` checks, the `crates-io`
 environment, crates.io authentication and upload, the artifact upload, and the GitHub release. It

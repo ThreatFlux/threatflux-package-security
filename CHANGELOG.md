@@ -12,6 +12,8 @@ All notable changes to this project are documented in this file. The format foll
   into the re-exported type. Existing RFC 3339 UTC advisory strings remain
   readable and retain their serialized format.
 - Updated `regex` to 1.13.2, `toml` to 1.2.2, and `zip` to 9.8.1.
+- Auto Release proposes version bumps through a code-owner-reviewed pull
+  request. Tagging waits for CI and Security on the merged version.
 
 ### Security
 
