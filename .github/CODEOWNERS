@@ -2,6 +2,7 @@
 * @wroersma @vtriple
 
 # Supply-chain and release controls
+/.github/CODEOWNERS @wroersma @vtriple
 /.github/workflows/ @wroersma @vtriple
 /.github/dependabot.yml @wroersma @vtriple
 /Cargo.toml @wroersma @vtriple

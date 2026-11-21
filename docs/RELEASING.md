@@ -54,6 +54,11 @@ dispatches nothing. Only when no App is configured and the release falls back to
 whose tag push starts no workflow, does it dispatch `release.yml` on the new tag. Either way
 `release.yml` runs once per release.
 
+For the advisory timestamp migration, automatic release from package version
+0.2.6 selects the pre-1.0 compatibility bump to 0.3.0. Subsequent versions use the
+shared release action's automatic bump selection. Explicit manual bump inputs
+continue to take precedence.
+
 The App creates the GitHub release with notes that list only breaking, feature, and fix commits.
 When a release has none of those (for example a forced patch release of `ci:` and `docs:`
 commits), the body is only its `## Release <tag>` heading, and `release.yml` replaces it with
