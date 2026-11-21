@@ -37,24 +37,29 @@ permissions:
 jobs:
   select-bump:
     name: Select release version bump
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.event != 'pull_request')
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
       bump: ${{ steps.bump.outputs.bump }}
     steps:
-      - name: Check out the release source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Respect the 0.3 compatibility boundary
         id: bump
         env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
           REQUESTED_BUMP: ${{ inputs.version_bump || 'auto' }}
         run: |
           set -euo pipefail
-          version="$(python3 -I -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')"
+          version="$(
+            gh api -H 'Accept: application/vnd.github.raw+json' \
+              "repos/$GITHUB_REPOSITORY/contents/Cargo.toml?ref=$SOURCE_SHA" |
+              python3 -I -c 'import sys, tomllib; print(tomllib.load(sys.stdin.buffer)["package"]["version"])'
+          )"
           bump="$REQUESTED_BUMP"
           # The advisory timestamp migration breaks Rust source compatibility
           # on the 0.2 line. The shared action otherwise maps it to 1.0.0.
