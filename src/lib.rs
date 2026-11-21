@@ -17,6 +17,8 @@ pub use core::{
 pub use analyzers::{java::JavaAnalyzer, npm::NpmAnalyzer, python::PythonAnalyzer};
 
 pub use core::AdvisoryCatalog;
+/// UTC instant used by advisory records and catalog statistics.
+pub use jiff::Timestamp as AdvisoryTimestamp;
 pub use vulnerability_db::VulnerabilityDatabase;
 
 use anyhow::Result;

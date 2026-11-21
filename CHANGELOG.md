@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Changed
+
+- The optional `Vulnerability::published_date`, `Vulnerability::updated_date`,
+  and `DatabaseStatistics::last_updated` fields use `AdvisoryTimestamp` (Jiff)
+  in place of `chrono::DateTime<Utc>`. Rust callers can parse an RFC 3339 string
+  into the re-exported type. Existing RFC 3339 UTC advisory strings remain
+  readable and retain their serialized format.
+- Updated `regex` to 1.13.2, `toml` to 1.2.2, and `zip` to 9.8.1.
+
+### Security
+
+- Replaced the unmaintained `chrono` dependency with Jiff 1.0.1 to clear
+  RUSTSEC-2026-0543.
+
 ### Fixed
 
 - `release.yml` replaces a GitHub release body that is only its

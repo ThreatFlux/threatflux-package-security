@@ -57,6 +57,11 @@ Java archives are rejected when public built-in limits are exceeded, when member
 
 ## Vulnerability matching
 
+The optional advisory and catalog timestamps use `AdvisoryTimestamp`, a UTC
+instant re-exported from Jiff. The serialized fields keep their RFC 3339 UTC
+strings or `null`. Jiff bounds representable years and normalizes leap seconds
+to the preceding second.
+
 The standard npm and Python analyzers contain bounded, embedded advisory snapshots for selected package/advisory pairs. They are available offline, report `DatabaseCoverage::CuratedPartial` with an as-of date and provenance, and cannot be updated. Java analysis does not consult a snapshot.
 
 A built-in match means a record associated with the ecosystem and normalized package name matched either the analyzed subject's exact version or an exact dependency version. Ranges, wildcards, tags, URLs, marked Python requirements, and malformed requirements are not treated as confirmed built-in matches and may be listed in `DependencyAnalysis::unresolved_requirements`. Embedded `affected_versions` values model advisory introduced/fixed intervals. They include prereleases by version precedence and are not npm or PEP 440 dependency-specifier prerelease filters. A match does not mean:
