@@ -57,10 +57,10 @@ Java archives are rejected when public built-in limits are exceeded, when member
 
 ## Vulnerability matching
 
-The optional advisory and catalog timestamps use `AdvisoryTimestamp`, a UTC
-instant re-exported from Jiff. The serialized fields keep their RFC 3339 UTC
-strings or `null`. Jiff bounds representable years and normalizes leap seconds
-to the preceding second.
+The optional advisory and catalog timestamps use `AdvisoryTimestamp`. They
+serialize as UTC strings or `null`. Timestamp strings retain signed expanded
+years from -262143 through +262142, leap seconds, and 0, 3, 6, or 9 fractional
+digits. Offset timestamps deserialize to UTC.
 
 The standard npm and Python analyzers contain bounded, embedded advisory snapshots for selected package/advisory pairs. They are available offline, report `DatabaseCoverage::CuratedPartial` with an as-of date and provenance, and cannot be updated. Java analysis does not consult a snapshot.
 

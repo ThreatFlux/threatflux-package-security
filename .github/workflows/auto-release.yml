@@ -38,28 +38,69 @@ jobs:
   select-bump:
     name: Select release version bump
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && (inputs.dry_run || github.ref == 'refs/heads/main')) ||
       (github.event.workflow_run.head_repository.full_name == github.repository &&
-      github.event.workflow_run.event != 'pull_request')
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
     outputs:
       bump: ${{ steps.bump.outputs.bump }}
     steps:
-      - name: Respect the 0.3 compatibility boundary
+      - name: Validate the release source and select its bump
         id: bump
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
           REQUESTED_BUMP: ${{ inputs.version_bump || 'auto' }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          RELEASE_BRANCH: automation/release
         run: |
           set -euo pipefail
-          version="$(
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          manifest_version() {
             gh api -H 'Accept: application/vnd.github.raw+json' \
-              "repos/$GITHUB_REPOSITORY/contents/Cargo.toml?ref=$SOURCE_SHA" |
+              "repos/$GITHUB_REPOSITORY/contents/Cargo.toml?ref=$1" |
               python3 -I -c 'import sys, tomllib; print(tomllib.load(sys.stdin.buffer)["package"]["version"])'
-          )"
+          }
+          version="$(manifest_version "$SOURCE_SHA")"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
+
+          if [[ "$DRY_RUN" != true ]]; then
+            ref="refs/tags/v$version"
+            tags="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v$version")"
+            if ! jq -e --arg ref "$ref" 'any(.[]; .ref == $ref)' <<< "$tags" >/dev/null; then
+              # The reusable workflow can finalize an untagged manifest without
+              # proposing another bump. Bind that path to the exact reviewed merge.
+              pulls="$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/pulls")"
+              proposal_head="$(jq -er --arg sha "$SOURCE_SHA" --arg repo "$GITHUB_REPOSITORY" \
+                --arg branch "$RELEASE_BRANCH" --arg tag "v$version" '
+                  [.[][] | select(.merged_at != null and .merge_commit_sha == $sha
+                    and .base.ref == "main" and .base.repo.full_name == $repo
+                    and .head.ref == $branch and .head.repo.full_name == $repo
+                    and .user.login == "threatflux-automation[bot]"
+                    and .title == ("chore(release): " + $tag))]
+                  | if length == 1 then .[0].head.sha else empty end
+                ' <<< "$pulls")" || {
+                  echo "Refusing to tag v$version: $SOURCE_SHA is not the exact merge of its automation release proposal." >&2
+                  exit 1
+                }
+              [[ "$proposal_head" =~ ^[0-9a-f]{40}$ ]]
+              for sha in "$proposal_head" "$SOURCE_SHA"; do
+                gh api "repos/$GITHUB_REPOSITORY/commits/$sha" |
+                  jq -e '.commit.verification.verified == true' >/dev/null
+              done
+              parent="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA" --jq '.parents[0].sha')"
+              [[ "$parent" =~ ^[0-9a-f]{40}$ ]]
+              if [[ "$(manifest_version "$parent")" == "$version" ]]; then
+                echo "Refusing to tag v$version: the merge did not introduce that manifest version." >&2
+                exit 1
+              fi
+            fi
+          fi
+
           bump="$REQUESTED_BUMP"
           # The advisory timestamp migration breaks Rust source compatibility
           # on the 0.2 line. The shared action otherwise maps it to 1.0.0.
@@ -81,6 +122,7 @@ jobs:
       dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
       required-workflows: CI,Security
       create-pr: true
+      release-branch: automation/release
       # The ThreatFlux automation App pushes the release tag, which starts
       # release.yml through its `push: tags` trigger, so the reusable workflow
       # dispatches nothing on that path (dispatch-on-app-token stays false).

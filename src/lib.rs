@@ -3,6 +3,7 @@
 //! Bounded metadata inspection and review signals for npm and Python project
 //! directories plus ZIP-compatible Java package archives.
 
+mod advisory_timestamp;
 pub mod analyzers;
 pub mod core;
 pub mod limits;
@@ -16,9 +17,8 @@ pub use core::{
 
 pub use analyzers::{java::JavaAnalyzer, npm::NpmAnalyzer, python::PythonAnalyzer};
 
+pub use advisory_timestamp::{AdvisoryTimestamp, ParseAdvisoryTimestampError};
 pub use core::AdvisoryCatalog;
-/// UTC instant used by advisory records and catalog statistics.
-pub use jiff::Timestamp as AdvisoryTimestamp;
 pub use vulnerability_db::VulnerabilityDatabase;
 
 use anyhow::Result;

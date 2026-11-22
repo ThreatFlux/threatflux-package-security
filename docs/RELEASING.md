@@ -48,8 +48,13 @@ Versions 0.2.0 and 0.2.1 were published with a registry token. That fallback has
 After CI and Security pass on the current `main` commit, `auto-release.yml` uses
 the shared ThreatFlux reusable workflow to open or update a version-bump pull
 request from `automation/release`. The proposal follows the same code-owner
-review and merge rules as other changes. After it merges, CI and Security
-must pass on the new `main` commit before automation tags that reviewed version.
+review and merge rules as other changes. Automation tags only the exact
+verified merge commit of the same-repository release proposal, after CI and
+Security pass on that commit and while it is the current `main` head. The
+proposal head and its merge commit must both have verified signatures. If
+`main` advances before publication, recover through a reviewed PR restoring the
+last tagged manifest and lockfile version, then let automation propose the
+release again on the new head.
 
 The workflow uses an installation token from the ThreatFlux automation
 GitHub App (organization variable `TF_AUTOMATION_APP_ID` and secret
