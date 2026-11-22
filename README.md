@@ -37,7 +37,7 @@ See [Behavior and guarantees](docs/BEHAVIOR.md) for the precise contract.
 
 ```toml
 [dependencies]
-threatflux-package-security = "0.2.0"
+threatflux-package-security = "0.3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
