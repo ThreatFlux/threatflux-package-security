@@ -57,6 +57,7 @@ jobs:
           REQUESTED_BUMP: ${{ inputs.version_bump || 'auto' }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
           RELEASE_BRANCH: automation/release
+          RELEASE_AUTHOR: ${{ vars.TF_AUTOMATION_APP_ID != '' && 'threatflux-automation[bot]' || 'github-actions[bot]' }}
         run: |
           set -euo pipefail
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -76,11 +77,11 @@ jobs:
               # proposing another bump. Bind that path to the exact reviewed merge.
               pulls="$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/pulls")"
               proposal_head="$(jq -er --arg sha "$SOURCE_SHA" --arg repo "$GITHUB_REPOSITORY" \
-                --arg branch "$RELEASE_BRANCH" --arg tag "v$version" '
+                --arg branch "$RELEASE_BRANCH" --arg author "$RELEASE_AUTHOR" --arg tag "v$version" '
                   [.[][] | select(.merged_at != null and .merge_commit_sha == $sha
                     and .base.ref == "main" and .base.repo.full_name == $repo
                     and .head.ref == $branch and .head.repo.full_name == $repo
-                    and .user.login == "threatflux-automation[bot]"
+                    and .user.login == $author
                     and .title == ("chore(release): " + $tag))]
                   | if length == 1 then .[0].head.sha else empty end
                 ' <<< "$pulls")" || {
