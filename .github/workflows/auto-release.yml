@@ -92,9 +92,15 @@ jobs:
                 gh api "repos/$GITHUB_REPOSITORY/commits/$sha" |
                   jq -e '.commit.verification.verified == true' >/dev/null
               done
+              proposal_version="$(manifest_version "$proposal_head")"
+              if [[ "$proposal_version" != "$version" ]]; then
+                echo "Refusing to tag v$version: the proposal declared $proposal_version." >&2
+                exit 1
+              fi
               parent="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA" --jq '.parents[0].sha')"
               [[ "$parent" =~ ^[0-9a-f]{40}$ ]]
-              if [[ "$(manifest_version "$parent")" == "$version" ]]; then
+              parent_version="$(manifest_version "$parent")"
+              if [[ "$parent_version" == "$version" ]]; then
                 echo "Refusing to tag v$version: the merge did not introduce that manifest version." >&2
                 exit 1
               fi
