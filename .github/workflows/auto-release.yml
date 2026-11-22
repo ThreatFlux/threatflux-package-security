@@ -35,8 +35,8 @@ permissions:
   pull-requests: read
 
 jobs:
-  select-bump:
-    name: Select release version bump
+  verify-source:
+    name: Validate release source
     if: >-
       (github.event_name == 'workflow_dispatch' && (inputs.dry_run || github.ref == 'refs/heads/main')) ||
       (github.event.workflow_run.head_repository.full_name == github.repository &&
@@ -46,15 +46,11 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    outputs:
-      bump: ${{ steps.bump.outputs.bump }}
     steps:
-      - name: Validate the release source and select its bump
-        id: bump
+      - name: Verify version and reviewed release proposal
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
-          REQUESTED_BUMP: ${{ inputs.version_bump || 'auto' }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
           RELEASE_BRANCH: automation/release
           RELEASE_AUTHOR: ${{ vars.TF_AUTOMATION_APP_ID != '' && 'threatflux-automation[bot]' || 'github-actions[bot]' }}
@@ -115,23 +111,16 @@ jobs:
             fi
           fi
 
-          bump="$REQUESTED_BUMP"
-          # The advisory timestamp migration breaks Rust source compatibility
-          # on the 0.2 line. The shared action otherwise maps it to 1.0.0.
-          if [[ "$bump" == auto && "$version" == 0.2.6 ]]; then
-            bump=minor
-          fi
-          printf 'bump=%s\n' "$bump" >> "$GITHUB_OUTPUT"
-
   release:
-    needs: select-bump
+    needs: verify-source
     permissions:
       actions: write
       contents: write
       pull-requests: write
-    uses: ThreatFlux/github_actions/.github/workflows/reusable-auto-release.yml@c0af79c1d1cbce16cb627d1301942ac668c98beb  # v0.7.11
+    uses: ThreatFlux/github_actions/.github/workflows/reusable-auto-release.yml@4b82a749e7479114c3335dd2806bb24f1b71cfe8  # PR #127, preserves higher open proposals
     with:
-      bump: ${{ needs.select-bump.outputs.bump }}
+      bump: ${{ inputs.version_bump || 'auto' }}
+      pre-v1-breaking-minor: true
       # Only a manual dispatch can request a dry run; workflow_run always releases.
       dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
       required-workflows: CI,Security
