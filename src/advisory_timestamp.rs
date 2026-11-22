@@ -1,7 +1,7 @@
-use regex::Regex;
+use regex::{Captures, Regex};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::{fmt, str::FromStr, sync::LazyLock};
-use time::{Date, Month, OffsetDateTime, Time};
+use time::{Date, Month, OffsetDateTime, Time, UtcOffset};
 
 const MIN_YEAR: i32 = -262_143;
 const MAX_YEAR: i32 = 262_142;
@@ -10,9 +10,10 @@ const NANOS_PER_SECOND: u32 = 1_000_000_000;
 // Keep the relaxed timestamp input accepted by the 0.2 wire format.
 static TIMESTAMP: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
-        r"(?x)\A\s*([+-][0-9]+|[0-9]{1,4})\s*-\s*([0-9]{1,2})\s*-\s*([0-9]{1,2})",
-        r"[Tt\x20]\s*([0-9]{1,2})\s*:\s*([0-9]{1,2})\s*:\s*([0-9]{1,2})",
-        r"(?:\.([0-9]+))?\s*(?:(?i:z|utc)|([+−-])([0-9]{2})[:\s]*([0-9]{2}))\s*\z",
+        r"(?x)\A\s*(?<year>[+-][0-9]+|[0-9]{1,4})\s*-\s*(?<month>[0-9]{1,2})",
+        r"\s*-\s*(?<day>[0-9]{1,2})[Tt\x20]\s*(?<hour>[0-9]{1,2})",
+        r"\s*:\s*(?<minute>[0-9]{1,2})\s*:\s*(?<second>[0-9]{1,2})(?:\.(?<fraction>[0-9]+))?",
+        r"\s*(?:(?i:z|utc)|(?<sign>[+−-])(?<offset_hour>[0-9]{2})[:\s]*(?<offset_minute>[0-9]{2}))\s*\z",
     ))
     .expect("valid advisory timestamp pattern")
 });
@@ -87,25 +88,28 @@ impl FromStr for AdvisoryTimestamp {
         let parts = TIMESTAMP
             .captures(value)
             .ok_or(ParseAdvisoryTimestampError)?;
-        let parse_small = |index: usize| {
-            parts[index]
+        let parse_small = |name: &str| {
+            parts[name]
                 .parse::<u8>()
                 .map_err(|_| ParseAdvisoryTimestampError)
         };
-        let year = parts[1].parse().map_err(|_| ParseAdvisoryTimestampError)?;
-        let month = Month::try_from(parse_small(2)?).map_err(|_| ParseAdvisoryTimestampError)?;
-        let date = Date::from_calendar_date(year, month, parse_small(3)?)
+        let year = parts["year"]
+            .parse()
             .map_err(|_| ParseAdvisoryTimestampError)?;
-        let second = parse_small(6)?;
+        let month =
+            Month::try_from(parse_small("month")?).map_err(|_| ParseAdvisoryTimestampError)?;
+        let date = Date::from_calendar_date(year, month, parse_small("day")?)
+            .map_err(|_| ParseAdvisoryTimestampError)?;
+        let second = parse_small("second")?;
         let leap_second = second == 60;
         let time = Time::from_hms(
-            parse_small(4)?,
-            parse_small(5)?,
+            parse_small("hour")?,
+            parse_small("minute")?,
             second - u8::from(leap_second),
         )
         .map_err(|_| ParseAdvisoryTimestampError)?;
         let mut nanosecond = u32::from(leap_second) * NANOS_PER_SECOND;
-        if let Some(fraction) = parts.get(7) {
+        if let Some(fraction) = parts.name("fraction") {
             let digits = fraction.as_str();
             let kept = &digits[..digits.len().min(9)];
             nanosecond += kept
@@ -113,23 +117,30 @@ impl FromStr for AdvisoryTimestamp {
                 .map_err(|_| ParseAdvisoryTimestampError)?
                 * 10_u32.pow(9 - kept.len() as u32);
         }
-        let mut offset_seconds = 0;
-        if let Some(sign) = parts.get(8) {
-            let hours = parse_small(9)?;
-            let minutes = parse_small(10)?;
-            if hours >= 24 || minutes >= 60 {
-                return Err(ParseAdvisoryTimestampError);
-            }
-            offset_seconds = i64::from(hours) * 3_600 + i64::from(minutes) * 60;
-            if sign.as_str() != "+" {
-                offset_seconds = -offset_seconds;
-            }
-        }
         Self::from_unix_timestamp(
-            date.with_time(time).assume_utc().unix_timestamp() - offset_seconds,
+            date.with_time(time)
+                .assume_offset(parse_offset(&parts)?)
+                .unix_timestamp(),
             nanosecond,
         )
     }
+}
+
+fn parse_offset(parts: &Captures<'_>) -> Result<UtcOffset, ParseAdvisoryTimestampError> {
+    let Some(sign) = parts.name("sign") else {
+        return Ok(UtcOffset::UTC);
+    };
+    let sign = if sign.as_str() == "+" { 1 } else { -1 };
+    let hours = parts["offset_hour"]
+        .parse::<i8>()
+        .map_err(|_| ParseAdvisoryTimestampError)?;
+    let minutes = parts["offset_minute"]
+        .parse::<i8>()
+        .map_err(|_| ParseAdvisoryTimestampError)?;
+    if hours >= 24 {
+        return Err(ParseAdvisoryTimestampError);
+    }
+    UtcOffset::from_hms(hours * sign, minutes * sign, 0).map_err(|_| ParseAdvisoryTimestampError)
 }
 
 impl fmt::Display for AdvisoryTimestamp {
