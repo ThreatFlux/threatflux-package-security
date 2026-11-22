@@ -89,18 +89,25 @@ jobs:
                   exit 1
                 }
               [[ "$proposal_head" =~ ^[0-9a-f]{40}$ ]]
-              for sha in "$proposal_head" "$SOURCE_SHA"; do
-                gh api "repos/$GITHUB_REPOSITORY/commits/$sha" |
-                  jq -e '.commit.verification.verified == true' >/dev/null
-              done
+              proposal_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$proposal_head")"
+              merge_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA")"
+              jq -e '.commit.verification.verified == true' <<< "$proposal_commit" >/dev/null
+              jq -e '.commit.verification.verified == true' <<< "$merge_commit" >/dev/null
+              proposal_parent="$(jq -er '.parents[0].sha' <<< "$proposal_commit")"
+              merge_parent="$(jq -er '.parents[0].sha' <<< "$merge_commit")"
+              proposal_tree="$(jq -er '.commit.tree.sha' <<< "$proposal_commit")"
+              merge_tree="$(jq -er '.commit.tree.sha' <<< "$merge_commit")"
+              if [[ "$proposal_parent" != "$merge_parent" || "$proposal_tree" != "$merge_tree" ]]; then
+                echo "Refusing to tag v$version: the merged tree or base differs from the tested release proposal." >&2
+                exit 1
+              fi
               proposal_version="$(manifest_version "$proposal_head")"
               if [[ "$proposal_version" != "$version" ]]; then
                 echo "Refusing to tag v$version: the proposal declared $proposal_version." >&2
                 exit 1
               fi
-              parent="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA" --jq '.parents[0].sha')"
-              [[ "$parent" =~ ^[0-9a-f]{40}$ ]]
-              parent_version="$(manifest_version "$parent")"
+              [[ "$merge_parent" =~ ^[0-9a-f]{40}$ ]]
+              parent_version="$(manifest_version "$merge_parent")"
               if [[ "$parent_version" == "$version" ]]; then
                 echo "Refusing to tag v$version: the merge did not introduce that manifest version." >&2
                 exit 1

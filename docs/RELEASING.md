@@ -51,10 +51,12 @@ request from `automation/release`. The proposal follows the same code-owner
 review and merge rules as other changes. Automation tags only the exact
 verified merge commit of the same-repository release proposal, after CI and
 Security pass on that commit and while it is the current `main` head. The
-proposal head and its merge commit must both have verified signatures. If
-`main` advances and the manifest version remains untagged, recover through a
-reviewed PR restoring the last tagged manifest and lockfile version. Automation
-can then propose the release again on the new head.
+proposal head and its merge commit must both have verified signatures and the
+same base commit and source tree. If `main` advances before the proposal
+merges, wait for automation to update the proposal against the new head and
+review the updated version. If the version has already merged but remains
+untagged, restore the last tagged manifest and lockfile version through a
+reviewed PR so automation can propose the release again.
 
 The workflow uses an installation token from the ThreatFlux automation
 GitHub App (organization variable `TF_AUTOMATION_APP_ID` and secret
