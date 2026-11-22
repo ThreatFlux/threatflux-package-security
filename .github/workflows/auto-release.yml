@@ -35,17 +35,97 @@ permissions:
   pull-requests: read
 
 jobs:
+  verify-source:
+    name: Validate release source
+    if: >-
+      (github.event_name == 'workflow_dispatch' && (inputs.dry_run || github.ref == 'refs/heads/main')) ||
+      (github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Verify version and reviewed release proposal
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          RELEASE_BRANCH: automation/release
+          RELEASE_AUTHOR: ${{ vars.TF_AUTOMATION_APP_ID != '' && 'threatflux-automation[bot]' || 'github-actions[bot]' }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          manifest_version() {
+            gh api -H 'Accept: application/vnd.github.raw+json' \
+              "repos/$GITHUB_REPOSITORY/contents/Cargo.toml?ref=$1" |
+              python3 -I -c 'import sys, tomllib; print(tomllib.load(sys.stdin.buffer)["package"]["version"])'
+          }
+          version="$(manifest_version "$SOURCE_SHA")"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
+
+          if [[ "$DRY_RUN" != true ]]; then
+            ref="refs/tags/v$version"
+            tags="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v$version")"
+            if ! jq -e --arg ref "$ref" 'any(.[]; .ref == $ref)' <<< "$tags" >/dev/null; then
+              # The reusable workflow can finalize an untagged manifest without
+              # proposing another bump. Bind that path to the exact reviewed merge.
+              pulls="$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/pulls")"
+              proposal_head="$(jq -er --arg sha "$SOURCE_SHA" --arg repo "$GITHUB_REPOSITORY" \
+                --arg branch "$RELEASE_BRANCH" --arg author "$RELEASE_AUTHOR" --arg tag "v$version" '
+                  [.[][] | select(.merged_at != null and .merge_commit_sha == $sha
+                    and .base.ref == "main" and .base.repo.full_name == $repo
+                    and .head.ref == $branch and .head.repo.full_name == $repo
+                    and .user.login == $author
+                    and .title == ("chore(release): " + $tag))]
+                  | if length == 1 then .[0].head.sha else empty end
+                ' <<< "$pulls")" || {
+                  echo "Refusing to tag v$version: $SOURCE_SHA is not the exact merge of its automation release proposal." >&2
+                  exit 1
+                }
+              [[ "$proposal_head" =~ ^[0-9a-f]{40}$ ]]
+              proposal_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$proposal_head")"
+              merge_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA")"
+              jq -e '.commit.verification.verified == true' <<< "$proposal_commit" >/dev/null
+              jq -e '.commit.verification.verified == true' <<< "$merge_commit" >/dev/null
+              proposal_parent="$(jq -er '.parents[0].sha' <<< "$proposal_commit")"
+              merge_parent="$(jq -er '.parents[0].sha' <<< "$merge_commit")"
+              proposal_tree="$(jq -er '.commit.tree.sha' <<< "$proposal_commit")"
+              merge_tree="$(jq -er '.commit.tree.sha' <<< "$merge_commit")"
+              if [[ "$proposal_parent" != "$merge_parent" || "$proposal_tree" != "$merge_tree" ]]; then
+                echo "Refusing to tag v$version: the merged tree or base differs from the tested release proposal." >&2
+                exit 1
+              fi
+              proposal_version="$(manifest_version "$proposal_head")"
+              if [[ "$proposal_version" != "$version" ]]; then
+                echo "Refusing to tag v$version: the proposal declared $proposal_version." >&2
+                exit 1
+              fi
+              [[ "$merge_parent" =~ ^[0-9a-f]{40}$ ]]
+              parent_version="$(manifest_version "$merge_parent")"
+              if [[ "$parent_version" == "$version" ]]; then
+                echo "Refusing to tag v$version: the merge did not introduce that manifest version." >&2
+                exit 1
+              fi
+            fi
+          fi
+
   release:
+    needs: verify-source
     permissions:
       actions: write
       contents: write
       pull-requests: write
-    uses: ThreatFlux/github_actions/.github/workflows/reusable-auto-release.yml@c0af79c1d1cbce16cb627d1301942ac668c98beb  # v0.7.11
+    uses: ThreatFlux/github_actions/.github/workflows/reusable-auto-release.yml@4b82a749e7479114c3335dd2806bb24f1b71cfe8  # PR #127, preserves higher open proposals
     with:
-      bump: ${{ github.event.inputs.version_bump || 'auto' }}
+      bump: ${{ inputs.version_bump || 'auto' }}
+      pre-v1-breaking-minor: true
       # Only a manual dispatch can request a dry run; workflow_run always releases.
       dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
       required-workflows: CI,Security
+      create-pr: true
+      release-branch: automation/release
       # The ThreatFlux automation App pushes the release tag, which starts
       # release.yml through its `push: tags` trigger, so the reusable workflow
       # dispatches nothing on that path (dispatch-on-app-token stays false).

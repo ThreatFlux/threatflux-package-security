@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Changed
+
+- The optional `Vulnerability::published_date`, `Vulnerability::updated_date`,
+  and `DatabaseStatistics::last_updated` fields use the crate's `AdvisoryTimestamp`
+  type in 0.3. Existing wire values retain their UTC representation, nanosecond
+  precision, leap seconds, and signed expanded-year range. See the
+  [0.3 migration guide](docs/MIGRATING_TO_0.3.md) for Rust caller changes.
+- Updated `regex` to 1.13.2, `toml` to 1.2.2, and `zip` to 9.8.1.
+- Auto Release proposes version bumps through a code-owner-reviewed pull
+  request. Tagging waits for CI and Security on the merged version.
+
+### Security
+
+- Replaced the unmaintained `chrono` dependency with `time` calendar support to clear
+  RUSTSEC-2026-0543.
+
 ### Fixed
 
 - `release.yml` replaces a GitHub release body that is only its

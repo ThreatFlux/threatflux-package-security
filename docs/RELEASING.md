@@ -45,14 +45,32 @@ Versions 0.2.0 and 0.2.1 were published with a registry token. That fallback has
 
 ## Automated releases
 
-`auto-release.yml` runs the shared ThreatFlux reusable release workflow after CI and Security pass
-on `main`. It cuts the release with an installation token from the ThreatFlux automation GitHub
-App (organization variable `TF_AUTOMATION_APP_ID` and secret `TF_AUTOMATION_APP_PRIVATE_KEY`). The
-token is scoped to this repository with `contents: write`. A tag the App pushes is an ordinary
-push, so it starts `release.yml` through its `push: tags` trigger and the reusable workflow
-dispatches nothing. Only when no App is configured and the release falls back to `GITHUB_TOKEN`,
-whose tag push starts no workflow, does it dispatch `release.yml` on the new tag. Either way
-`release.yml` runs once per release.
+After CI and Security pass on the current `main` commit, `auto-release.yml` uses
+the shared ThreatFlux reusable workflow to open or update a version-bump pull
+request from `automation/release`. The proposal follows the same code-owner
+review and merge rules as other changes. Automation tags only the exact
+verified merge commit of the same-repository release proposal, after CI and
+Security pass on that commit and while it is the current `main` head. The
+proposal head and its merge commit must both have verified signatures and the
+same base commit and source tree. If `main` advances before the proposal
+merges, wait for automation to update the proposal against the new head and
+review the updated version. If the version has already merged but remains
+untagged, restore the last tagged manifest and lockfile version through a
+reviewed PR so automation can propose the release again.
+
+The workflow uses an installation token from the ThreatFlux automation
+GitHub App (organization variable `TF_AUTOMATION_APP_ID` and secret
+`TF_AUTOMATION_APP_PRIVATE_KEY`) with repository-scoped contents and
+pull request write permissions. The App's tag push starts `release.yml`
+through its tag trigger. The reusable workflow explicitly dispatches
+`release.yml` only on the `GITHUB_TOKEN` fallback path, where a tag push
+cannot start another workflow.
+
+The shared workflow infers a minor bump for breaking changes before 1.0.
+For the advisory timestamp migration, this proposes 0.3.0 from 0.2.6.
+Explicit manual bump inputs still apply. Automatic refresh retains a higher
+version in an open release proposal and updates the proposal branch
+without force-pushing.
 
 The App creates the GitHub release with notes that list only breaking, feature, and fix commits.
 When a release has none of those (for example a forced patch release of `ci:` and `docs:`
@@ -74,8 +92,8 @@ version-bump commit would rewrite. It analyzes only after CI and Security have p
 dispatched commit; otherwise the release job is skipped. Like a real run, it fails if the
 `Cargo.toml` version is lower than the latest release tag. The `release.yml` dry run
 builds the dispatch ref (add `--ref <branch>` to rehearse another branch), needs no tag, and stages
-the same `Cargo.toml`/`Cargo.lock` version bump the automated release commit makes in a local,
-unpushed commit. It then runs the full test matrix and the publish-job gates that apply before a tag
+the same `Cargo.toml`/`Cargo.lock` version bump as the release proposal in a
+local, unpushed commit. It then runs the full test matrix and the publish-job gates that apply before a tag
 exists, through `cargo package` and `cargo publish --dry-run --locked`. It skips the
 `Verify annotated tag is on main` and `Recheck immutable release tag` checks, the `crates-io`
 environment, crates.io authentication and upload, the artifact upload, and the GitHub release. It

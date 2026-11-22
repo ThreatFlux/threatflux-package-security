@@ -62,6 +62,11 @@ Maintainers may request changes to preserve compatibility, bounded resource use,
 
 ## Review expectations
 
+Merging requires approval on the current pull request head from a code owner
+other than the author. The repository code owners are defined in
+[`CODEOWNERS`](.github/CODEOWNERS). Complete the automated checks and reviews
+before merging.
+
 Security-sensitive changes need explicit review of:
 
 - untrusted file and archive handling;
